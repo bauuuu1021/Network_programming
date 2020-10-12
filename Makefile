@@ -5,11 +5,14 @@ CMD_SRC = commands
 CMD = noop number removetag removetag0
 BIN_DIR = bin
 
-all: npshell build_in_cmd $(CMD)
+all: npshell
+
 npshell: npshell.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-build_in_cmd: 
+build_cmd: unix_cmd $(CMD)
+
+unix_cmd: 
 	mkdir -p $(BIN_DIR)
 	cp /bin/ls $(BIN_DIR)
 	cp /bin/cat $(BIN_DIR)
