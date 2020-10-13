@@ -4,6 +4,8 @@
 
 using namespace std;
 
+extern void execute_cmd(string cmd);
+
 void printenv(string cmd) {
     
     char *ret;
@@ -48,6 +50,9 @@ int main () {
         }
         else if (!cmd.compare(0, 6, "setenv")) {
             setenv(cmd);
+        }
+        else {
+            execute_cmd(cmd.c_str());
         }
 
         cout << "% ";

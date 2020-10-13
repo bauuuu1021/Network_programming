@@ -7,7 +7,7 @@ BIN_DIR = bin
 
 all: npshell
 
-npshell: npshell.cpp
+npshell: shell.cpp pipe.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 build_cmd: unix_cmd $(CMD)
