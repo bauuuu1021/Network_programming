@@ -5,6 +5,7 @@
 using namespace std;
 
 extern void execute_cmd(string cmd);
+long cmd_count;
 
 void printenv(string cmd) {
     
@@ -41,6 +42,7 @@ void setenv(string cmd) {
 int main () {
 
     setenv("PATH", "bin:.", !0);
+    cmd_count = 0;
 
     string cmd, delimiter = " ";
     cout << "% ";
@@ -58,15 +60,18 @@ int main () {
         
         if (!cmd.compare(0, 8, "printenv")) {
             printenv(cmd);
+            cmd_count++;
         }
         else if (!cmd.compare(0, 6, "setenv")) {
             setenv(cmd);
+            cmd_count++;
         }
         else if (cmd.length()==0) {     // empty command
             ;
         }
         else {
             execute_cmd(cmd.c_str());
+            cmd_count++;
         }
 
         cout << "% ";
