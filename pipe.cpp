@@ -49,9 +49,10 @@ void np_fork(string cmd) {
                     }
                 } 
             }
-            arg[arg_cnt] = strdup(parse_arg.c_str());
+            arg[arg_cnt++] = strdup(parse_arg.c_str());
+            arg[arg_cnt] = NULL;
 
-            if (execvp(cmd.c_str(), arg) == -1) {
+            if (execvp(arg[0], arg) == -1) {
                 cerr << "Unknown command: [" << cmd << "].\n";
             }
         }
