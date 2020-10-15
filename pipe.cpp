@@ -14,6 +14,21 @@ using namespace std;
 extern long cmd_count;
 vector<pid_t> child_list;
 
+string skip_lead_space(string str) {
+
+    string delimiter = " ";
+    while (str.length()!=0 && str.at(0)==' ') {
+        try {
+            str = str.substr(str.find(delimiter)+1);
+        }
+        catch (const std::exception& e) {
+            cerr << "[np_exec] skip leading 0:\n" << e.what() << "\n";
+        }
+    }
+
+    return str;
+}
+
 void np_exec(string cmd) {
     char *arg[ARG_MAX];
     int arg_cnt = 0, arg_end = 0;
@@ -27,20 +42,15 @@ void np_exec(string cmd) {
         string parse_arg(cmd), arg_delimiter = " ";
         while ((arg_end = parse_arg.find(arg_delimiter)) != string::npos) {
             string cur_arg = parse_arg.substr(0, arg_end);
-            arg[arg_cnt++] = strdup(cur_arg.c_str());
+            if (cur_arg.length())
+                arg[arg_cnt++] = strdup(cur_arg.c_str());
 
             // Skip leading space(s) of cmd
             parse_arg = parse_arg.substr(arg_end+1);
-            while (parse_arg.length()!=0 && parse_arg.at(0)==' ') {
-                try {
-                    parse_arg = parse_arg.substr(parse_arg.find(arg_delimiter)+1);
-                }
-                catch (const std::exception& e) {
-                    cerr << "[np_exec] skip leading 0:\n" << e.what() << "\n";
-                }
-            } 
+            parse_arg = skip_lead_space(parse_arg); 
         }
-        arg[arg_cnt++] = strdup(parse_arg.c_str());
+        if (parse_arg.length())
+            arg[arg_cnt++] = strdup(parse_arg.c_str());
         arg[arg_cnt] = NULL;
 
         if (execvp(arg[0], arg) == -1) {
@@ -78,14 +88,7 @@ void execute_cmd(string cmd) {
 
         // Skip leading space(s) of cmd
         cmd = cmd.substr(new_end+1);
-        while (cmd.length()!=0 && cmd.at(0)==' ') {
-            try {
-                cmd = cmd.substr(cmd.find(space_delimiter)+1);
-            }
-            catch (const std::exception& e) {
-                cerr << "[execute_cmd] skip leading 0:\n" << e.what() << "\n";
-            }
-        } 
+        cmd = skip_lead_space(cmd);
     }
     np_fork(cmd);
 
