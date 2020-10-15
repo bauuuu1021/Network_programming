@@ -23,3 +23,4 @@ $(CMD): %: $(CMD_SRC)/%.cpp
 .PHONY: clean
 clean:
 	rm -rf npshell $(BIN_DIR)
+
