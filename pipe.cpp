@@ -9,12 +9,19 @@
 #include <fcntl.h>
 
 #define ARG_MAX 1024
+#define LAST_CMD true
 
 using namespace std;
 
 extern long cmd_count;
 vector<pid_t> child_list;
-int redirect_fd;
+int redirect_fd, subcmd_count;
+
+typedef struct pipe_info {
+    int read_fd;
+    int write_fd;
+} pipe_info;
+vector<pipe_info> subcmd_pipe_list;
 
 string skip_lead_space(string str) {
 
@@ -87,15 +94,30 @@ void np_exec(string cmd) {
     }
 }
 
-void np_fork(string cmd) {
+void np_fork(string cmd, bool last_cmd) {
 
     pid_t child_pid;
+
+    // create pipe and store in vector list
+    int newpipe[2];
+    pipe_info tmp_pipe;
+    pipe(newpipe);
+    tmp_pipe.read_fd = newpipe[0];
+    tmp_pipe.write_fd = newpipe[1];
+    subcmd_pipe_list.push_back(tmp_pipe);
 
     while ((child_pid = fork())<0) {
         // handle fork error
     }
 
     if (child_pid == 0) {   // child process
+        // connect with previous sub-command
+        if (subcmd_count) { // first sub-command skip this step
+            dup2((subcmd_pipe_list.at(subcmd_count-1)).read_fd, STDIN_FILENO);
+        }
+        if (!last_cmd) {    // last sub-command skip this step
+            dup2((subcmd_pipe_list.at(subcmd_count)).write_fd, STDOUT_FILENO);
+        }
         np_exec(cmd);
     }
     else {  // parent process
@@ -109,19 +131,23 @@ void execute_cmd(string cmd) {
     string pipe_delimiter = "|", space_delimiter = " ";
     size_t new_end = 0;
     child_list.clear();
+    subcmd_count = 0;
+    subcmd_pipe_list.clear();
 
     while ((new_end = cmd.find(pipe_delimiter)) != string::npos) {
         string cur_cmd = cmd.substr(0, new_end);
-        np_fork(cur_cmd);
+        np_fork(cur_cmd, !LAST_CMD);
+        subcmd_count++;
 
         // Skip leading space(s) of cmd
         cmd = cmd.substr(new_end+1);
         cmd = skip_lead_space(cmd);
     }
-    np_fork(cmd);
+    np_fork(cmd, LAST_CMD);
+    subcmd_count++;
 
     for(const auto& pid: child_list) {
         int status;
-        waitpid(pid, &status, 0);
+        //waitpid(pid, &status, 0);
     }
 }
