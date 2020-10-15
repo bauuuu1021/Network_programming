@@ -6,6 +6,7 @@
 #include <vector>
 #include <sys/wait.h>
 #include <string.h>
+#include <fcntl.h>
 
 #define ARG_MAX 1024
 
@@ -13,6 +14,7 @@ using namespace std;
 
 extern long cmd_count;
 vector<pid_t> child_list;
+int redirect_fd;
 
 string skip_lead_space(string str) {
 
@@ -29,6 +31,23 @@ string skip_lead_space(string str) {
     return str;
 }
 
+int redirect_handler(string cmd) {  // return pos of '>' symbol if found, otherwise -1
+    int pos = cmd.find(">");
+
+    if (pos!=-1) {
+        string filename = cmd.substr(pos+1);
+        filename = skip_lead_space(filename);
+
+        redirect_fd = creat(filename.c_str(), 0666);
+        if (redirect_fd==-1) {
+            cerr << "open file failed\n" << filename <<endl;
+            return -1;
+        }
+    }
+
+    return pos;
+}
+
 void np_exec(string cmd) {
     char *arg[ARG_MAX];
     int arg_cnt = 0, arg_end = 0;
@@ -39,6 +58,15 @@ void np_exec(string cmd) {
     }
     else {  // normal commands
 
+        // handle redirect symbol (>)
+        redirect_fd = -1;
+        int pos;
+        if ((pos=redirect_handler(cmd))!=-1) {
+            cmd = cmd.substr(0, pos);
+            dup2(redirect_fd, STDOUT_FILENO);
+        }
+
+        // parse arguments
         string parse_arg(cmd), arg_delimiter = " ";
         while ((arg_end = parse_arg.find(arg_delimiter)) != string::npos) {
             string cur_arg = parse_arg.substr(0, arg_end);
