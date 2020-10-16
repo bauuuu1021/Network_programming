@@ -111,13 +111,27 @@ void np_fork(string cmd, bool last_cmd) {
     }
 
     if (child_pid == 0) {   // child process
-        // connect with previous sub-command
-        if (subcmd_count) { // first sub-command skip this step
-            dup2((subcmd_pipe_list.at(subcmd_count-1)).read_fd, STDIN_FILENO);
+        
+        // connect with pipes
+        if (!subcmd_count && last_cmd) {    // only 1 subcmd
+            // check numPiped : need input pipe or not
+            // check numPiped : need output pipe or not
         }
-        if (!last_cmd) {    // last sub-command skip this step
+        else if (!subcmd_count) {    // first subcmd
+            // check numPiped : need input pipe or not
             dup2((subcmd_pipe_list.at(subcmd_count)).write_fd, STDOUT_FILENO);
         }
+        else if (last_cmd) {   // last subcmd
+            // check numPiped : need output pipe or not
+            dup2((subcmd_pipe_list.at(subcmd_count-1)).read_fd, STDIN_FILENO);
+        }
+        else {                  // others
+            dup2((subcmd_pipe_list.at(subcmd_count-1)).read_fd, STDIN_FILENO);
+            dup2((subcmd_pipe_list.at(subcmd_count)).write_fd, STDOUT_FILENO);
+        }
+        close(subcmd_pipe_list.at(subcmd_count).read_fd);
+        close(subcmd_pipe_list.at(subcmd_count).write_fd);
+        
         np_exec(cmd);
     }
     else {  // parent process
