@@ -92,6 +92,7 @@ void np_exec(string cmd) {
 
         if (execvp(arg[0], arg) == -1) {
             cerr << "Unknown command: [" << cmd << "].\n";
+            exit(0);
         }
     }
 }
