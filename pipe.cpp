@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <fcntl.h>
+#include <map>
 
 #define ARG_MAX 1024
 #define LAST_CMD true
@@ -14,6 +15,7 @@
 using namespace std;
 
 extern long cmd_count;
+extern map<int, int> pipe_table;
 vector<pid_t> child_list;
 int redirect_fd, subcmd_count;
 
@@ -61,7 +63,7 @@ void np_exec(string cmd) {
     string arg_delimiter = " ";
 
     if (isdigit(cmd.at(0))) {   // numbered pipe
-        cout << "number pipe\n";
+        //cout << "number pipe\n";
     }
     else {  // normal commands
 
@@ -105,6 +107,17 @@ void np_fork(string cmd, bool last_cmd) {
     tmp_pipe.read_fd = newpipe[0];
     tmp_pipe.write_fd = newpipe[1];
     subcmd_pipe_list.push_back(tmp_pipe);
+
+    if (isdigit(cmd.at(0))) {   // numbered pipe
+        long cmd_index = stol(cmd) + cmd_count;
+        pipe_table.insert(pair<int, int>(cmd_index, dup(tmp_pipe.read_fd)));
+        return;
+    }
+    if (pipe_table.find(cmd_count)!=pipe_table.end() && !subcmd_count) {
+        cout << "arrive\n";
+        dup2(pipe_table.find(cmd_count)->second, STDIN_FILENO);
+        close(pipe_table.find(cmd_count)->second);
+    }
 
     while ((child_pid = fork())<0) {
         int status;

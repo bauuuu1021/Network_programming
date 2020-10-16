@@ -3,11 +3,13 @@
 #include <string>
 #include <signal.h>
 #include <sys/wait.h>
+#include <map>
 
 using namespace std;
 
 extern void execute_cmd(string cmd);
 long cmd_count;
+map<int, int> pipe_table;
 
 void waitChildHandler(int signo) {
     int status;
@@ -51,6 +53,7 @@ int main () {
     signal(SIGCHLD, waitChildHandler);
     setenv("PATH", "bin:.", !0);
     cmd_count = 0;
+    pipe_table.clear();
 
     string cmd, delimiter = " ";
     cout << "% ";
