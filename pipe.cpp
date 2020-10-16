@@ -129,8 +129,11 @@ void np_fork(string cmd, bool last_cmd) {
             dup2((subcmd_pipe_list.at(subcmd_count-1)).read_fd, STDIN_FILENO);
             dup2((subcmd_pipe_list.at(subcmd_count)).write_fd, STDOUT_FILENO);
         }
-        close(subcmd_pipe_list.at(subcmd_count).read_fd);
-        close(subcmd_pipe_list.at(subcmd_count).write_fd);
+        
+        for (const auto& it: subcmd_pipe_list) {
+            close(it.read_fd);
+            close(it.write_fd);
+        }
         
         np_exec(cmd);
     }
@@ -160,8 +163,13 @@ void execute_cmd(string cmd) {
     np_fork(cmd, LAST_CMD);
     subcmd_count++;
 
-    for(const auto& pid: child_list) {
+    for (const auto& it: subcmd_pipe_list) {
+        close(it.read_fd);
+        close(it.write_fd);
+    }
+
+    for (const auto& pid: child_list) {
         int status;
-        //waitpid(pid, &status, 0);
+        waitpid(pid, &status, 0);
     }
 }
