@@ -110,13 +110,10 @@ void np_fork(string cmd, bool last_cmd) {
 
     if (isdigit(cmd.at(0))) {   // numbered pipe
         long cmd_index = stol(cmd) + cmd_count;
-        pipe_table.insert(pair<int, int>(cmd_index, dup(tmp_pipe.read_fd)));
+        int new_fd = dup(subcmd_pipe_list.at(subcmd_count-1).read_fd);
+        pipe_table.insert(pair<int, int>(cmd_index, new_fd));
+
         return;
-    }
-    if (pipe_table.find(cmd_count)!=pipe_table.end() && !subcmd_count) {
-        cout << "arrive\n";
-        dup2(pipe_table.find(cmd_count)->second, STDIN_FILENO);
-        close(pipe_table.find(cmd_count)->second);
     }
 
     while ((child_pid = fork())<0) {
@@ -125,7 +122,12 @@ void np_fork(string cmd, bool last_cmd) {
     }
 
     if (child_pid == 0) {   // child process
-        
+
+        if (pipe_table.find(cmd_count)!=pipe_table.end() && !subcmd_count) {
+            dup2(pipe_table.find(cmd_count)->second, STDIN_FILENO);
+            close(pipe_table.find(cmd_count)->second);
+        }
+
         // connect with pipes
         if (!subcmd_count && last_cmd) {    // only 1 subcmd
             // check numPiped : need input pipe or not
@@ -143,12 +145,12 @@ void np_fork(string cmd, bool last_cmd) {
             dup2((subcmd_pipe_list.at(subcmd_count-1)).read_fd, STDIN_FILENO);
             dup2((subcmd_pipe_list.at(subcmd_count)).write_fd, STDOUT_FILENO);
         }
-        
+
         for (const auto& it: subcmd_pipe_list) {
             close(it.read_fd);
             close(it.write_fd);
         }
-        
+
         np_exec(cmd);
     }
     else {  // parent process
