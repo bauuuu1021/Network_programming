@@ -16,7 +16,7 @@ using namespace std;
 
 extern long cmd_count;
 extern map<int, int> pipe_table;
-vector<pid_t> child_list;
+vector<pid_t> childpid_list;
 int redirect_fd, subcmd_count;
 
 typedef struct pipe_info {
@@ -33,7 +33,7 @@ string skip_lead_space(string str) {
             str = str.substr(str.find(delimiter)+1);
         }
         catch (const std::exception& e) {
-            cerr << "[np_exec] skip leading 0:\n" << e.what() << "\n";
+            cerr << "skip leading spaces:\n" << e.what() << "\n";
         }
     }
 
@@ -43,12 +43,12 @@ string skip_lead_space(string str) {
 int redirect_handler(string cmd) {  // return pos of '>' symbol if found, otherwise -1
     int pos = cmd.find(">");
 
-    if (pos!=-1) {
+    if (pos != -1) {
         string filename = cmd.substr(pos+1);
         filename = skip_lead_space(filename);
 
         redirect_fd = creat(filename.c_str(), 0666);
-        if (redirect_fd==-1) {
+        if (redirect_fd == -1) {
             cerr << "open file failed\n" << filename <<endl;
             return -1;
         }
@@ -62,39 +62,34 @@ void np_exec(string cmd) {
     int arg_cnt = 0, arg_end = 0;
     string arg_delimiter = " ";
 
-    if (isdigit(cmd.at(0))) {   // numbered pipe
-        //cout << "number pipe\n";
+
+    // handle redirect symbol (>)
+    redirect_fd = -1;
+    int pos;
+    if ((pos = redirect_handler(cmd)) != -1) {
+        cmd = cmd.substr(0, pos);
+        dup2(redirect_fd, STDOUT_FILENO);
     }
-    else {  // normal commands
 
-        // handle redirect symbol (>)
-        redirect_fd = -1;
-        int pos;
-        if ((pos=redirect_handler(cmd))!=-1) {
-            cmd = cmd.substr(0, pos);
-            dup2(redirect_fd, STDOUT_FILENO);
-        }
+    // parse arguments
+    string parse_arg(cmd);
+    while ((arg_end = parse_arg.find(arg_delimiter)) != string::npos) {
+        string cur_arg = parse_arg.substr(0, arg_end);
+        if (cur_arg.length())
+            arg[arg_cnt++] = strdup(cur_arg.c_str());
 
-        // parse arguments
-        string parse_arg(cmd), arg_delimiter = " ";
-        while ((arg_end = parse_arg.find(arg_delimiter)) != string::npos) {
-            string cur_arg = parse_arg.substr(0, arg_end);
-            if (cur_arg.length())
-                arg[arg_cnt++] = strdup(cur_arg.c_str());
-
-            // Skip leading space(s) of cmd
-            parse_arg = parse_arg.substr(arg_end+1);
-            parse_arg = skip_lead_space(parse_arg); 
-        }
-        if (parse_arg.length())
-            arg[arg_cnt++] = strdup(parse_arg.c_str());
-        arg[arg_cnt] = NULL;
-
-        if (execvp(arg[0], arg) == -1) {
-            cerr << "Unknown command: [" << cmd << "].\n";
-            exit(0);
-        }
+        parse_arg = parse_arg.substr(arg_end+1);
+        parse_arg = skip_lead_space(parse_arg); 
     }
+    if (parse_arg.length())
+        arg[arg_cnt++] = strdup(parse_arg.c_str());
+    arg[arg_cnt] = NULL;
+
+    if (execvp(arg[0], arg) == -1) {
+        cerr << "Unknown command: [" << cmd << "].\n";
+        exit(0);
+    }
+
 }
 
 void np_fork(string cmd, bool last_cmd) {
@@ -111,8 +106,8 @@ void np_fork(string cmd, bool last_cmd) {
 
     if (isdigit(cmd.at(0))) {   // numbered pipe
         long cmd_index = stol(cmd) + cmd_count;
-        int new_fd = dup(subcmd_pipe_list.at(subcmd_count-1).read_fd);
-        pipe_table.insert(pair<int, int>(cmd_index, new_fd));
+        int dup_fd = dup(subcmd_pipe_list.at(subcmd_count-1).read_fd);
+        pipe_table.insert(pair<int, int>(cmd_index, dup_fd));
 
         return;
     }
@@ -131,18 +126,15 @@ void np_fork(string cmd, bool last_cmd) {
 
         // connect with pipes
         if (!subcmd_count && last_cmd) {    // only 1 subcmd
-            // check numPiped : need input pipe or not
-            // check numPiped : need output pipe or not
+            ;
         }
-        else if (!subcmd_count) {    // first subcmd
-            // check numPiped : need input pipe or not
+        else if (!subcmd_count) {           // first subcmd
             dup2((subcmd_pipe_list.at(subcmd_count)).write_fd, STDOUT_FILENO);
         }
-        else if (last_cmd) {   // last subcmd
-            // check numPiped : need output pipe or not
+        else if (last_cmd) {                // last subcmd
             dup2((subcmd_pipe_list.at(subcmd_count-1)).read_fd, STDIN_FILENO);
         }
-        else {                  // others
+        else {                              // others
             dup2((subcmd_pipe_list.at(subcmd_count-1)).read_fd, STDIN_FILENO);
             dup2((subcmd_pipe_list.at(subcmd_count)).write_fd, STDOUT_FILENO);
         }
@@ -155,7 +147,7 @@ void np_fork(string cmd, bool last_cmd) {
         np_exec(cmd);
     }
     else {  // parent process
-        child_list.push_back(child_pid);
+        childpid_list.push_back(child_pid);
     }
 
 }
@@ -164,7 +156,7 @@ void execute_cmd(string cmd) {
 
     string pipe_delimiter = "|", space_delimiter = " ";
     size_t new_end = 0;
-    child_list.clear();
+    childpid_list.clear();
     subcmd_count = 0;
     subcmd_pipe_list.clear();
 
@@ -173,7 +165,6 @@ void execute_cmd(string cmd) {
         np_fork(cur_cmd, !LAST_CMD);
         subcmd_count++;
 
-        // Skip leading space(s) of cmd
         cmd = cmd.substr(new_end+1);
         cmd = skip_lead_space(cmd);
     }
@@ -185,7 +176,7 @@ void execute_cmd(string cmd) {
         close(it.write_fd);
     }
 
-    for (const auto& pid: child_list) {
+    for (const auto& pid: childpid_list) {
         int status;
         waitpid(pid, &status, 0);
     }

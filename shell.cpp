@@ -8,6 +8,7 @@
 using namespace std;
 
 extern void execute_cmd(string cmd);
+extern string skip_lead_space(string str);
 long cmd_count;
 map<int, int> pipe_table;
 
@@ -17,7 +18,7 @@ void waitChildHandler(int signo) {
 }
 
 void printenv(string cmd) {
-    
+
     char *ret;
 
     try {
@@ -59,16 +60,8 @@ int main () {
     cout << "% ";
     while (getline(cin, cmd) && cmd.compare("exit")) {
 
-        // Skip leading space(s) of cmd
-        while (cmd.length()!=0 && cmd.at(0)==' ') {
-            try {
-                cmd = cmd.substr(cmd.find(delimiter)+1);
-            }
-            catch (const std::exception& e) {
-                cerr << "[rm leading space] error:\n" << e.what() << "\n";
-            }
-        }         
-        
+        cmd = skip_lead_space(cmd);         
+
         if (!cmd.compare(0, 8, "printenv")) {
             printenv(cmd);
             cmd_count++;
@@ -81,7 +74,7 @@ int main () {
             ;
         }
         else {
-            execute_cmd(cmd.c_str());
+            execute_cmd(cmd);
             cmd_count++;
         }
 
