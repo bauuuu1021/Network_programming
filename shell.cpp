@@ -1,11 +1,18 @@
 #include <iostream>
 #include <stdio.h>
 #include <string>
+#include <signal.h>
+#include <sys/wait.h>
 
 using namespace std;
 
 extern void execute_cmd(string cmd);
 long cmd_count;
+
+void waitChildHandler(int signo) {
+    int status;
+    while (waitpid(-1, &status, WNOHANG) > 0);
+}
 
 void printenv(string cmd) {
     
@@ -41,6 +48,7 @@ void setenv(string cmd) {
 
 int main () {
 
+    signal(SIGCHLD, waitChildHandler);
     setenv("PATH", "bin:.", !0);
     cmd_count = 0;
 

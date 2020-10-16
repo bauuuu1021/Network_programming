@@ -107,7 +107,8 @@ void np_fork(string cmd, bool last_cmd) {
     subcmd_pipe_list.push_back(tmp_pipe);
 
     while ((child_pid = fork())<0) {
-        // handle fork error
+        int status;
+        waitpid(-1, &status, 0);
     }
 
     if (child_pid == 0) {   // child process
