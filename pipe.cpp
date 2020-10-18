@@ -14,16 +14,16 @@
 
 using namespace std;
 
-extern long cmd_count;
-extern map<int, int> pipe_table;
-vector<pid_t> childpid_list;
-int redirect_fd, subcmd_count;
-
 typedef struct pipe_info {
     int read_fd;
     int write_fd;
 } pipe_info;
 vector<pipe_info> subcmd_pipe_list;
+
+extern long cmd_count;
+extern map<int, pipe_info> pipe_table;
+vector<pid_t> childpid_list;
+int redirect_fd, subcmd_count;
 
 string skip_lead_space(string str) {
 
@@ -106,8 +106,33 @@ void np_fork(string cmd, bool last_cmd) {
 
     if (isdigit(cmd.at(0))) {   // numbered pipe
         long cmd_index = stol(cmd) + cmd_count;
-        int dup_fd = dup(subcmd_pipe_list.at(subcmd_count-1).read_fd);
-        pipe_table.insert(pair<int, int>(cmd_index, dup_fd));
+        pipe_info pipe_out;
+        int newpipe[2];
+        pipe(newpipe);
+
+        auto pip_ele = pipe_table.find(cmd_index);
+        if (pip_ele == pipe_table.end()) {  // no existed pipe for cmd_index
+            
+            dup2(subcmd_pipe_list.at(subcmd_count-1).read_fd, newpipe[0]);
+            pipe_out.read_fd = newpipe[0];
+            pipe_out.write_fd = newpipe[1];
+
+            pipe_table.insert(pair<int, pipe_info>(cmd_index, pipe_out));
+        }
+        else {  // merge previous pipe(s)
+
+            dup2(pip_ele->second.read_fd, newpipe[0]);
+            dup2(subcmd_pipe_list.at(subcmd_count-1).read_fd, newpipe[0]);
+
+            close(pip_ele->second.read_fd);
+            close(pip_ele->second.write_fd);
+
+            pipe_out.read_fd = newpipe[0];
+            pipe_out.write_fd = newpipe[1];
+
+            pipe_table.erase(pip_ele);
+            pipe_table.insert(pair<int, pipe_info>(cmd_index, pipe_out));
+        }
 
         return;
     }
@@ -120,8 +145,9 @@ void np_fork(string cmd, bool last_cmd) {
     if (child_pid == 0) {   // child process
 
         if (pipe_table.find(cmd_count)!=pipe_table.end() && !subcmd_count) {
-            dup2(pipe_table.find(cmd_count)->second, STDIN_FILENO);
-            close(pipe_table.find(cmd_count)->second);
+            dup2(pipe_table.find(cmd_count)->second.read_fd, STDIN_FILENO);
+            close(pipe_table.find(cmd_count)->second.read_fd);
+            close(pipe_table.find(cmd_count)->second.write_fd);
         }
 
         // connect with pipes
@@ -174,6 +200,12 @@ void execute_cmd(string cmd) {
     for (const auto& it: subcmd_pipe_list) {
         close(it.read_fd);
         close(it.write_fd);
+    }
+
+    auto pip_ele = pipe_table.find(cmd_count);
+    if (pip_ele != pipe_table.end()) {
+        close(pip_ele->second.read_fd);
+        close(pip_ele->second.write_fd);
     }
 
     for (const auto& pid: childpid_list) {

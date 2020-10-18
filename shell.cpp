@@ -7,10 +7,15 @@
 
 using namespace std;
 
+typedef struct pipe_info {
+    int read_fd;
+    int write_fd;
+} pipe_info;
+
 extern void execute_cmd(string cmd);
 extern string skip_lead_space(string str);
 long cmd_count;
-map<int, int> pipe_table;
+map<int, pipe_info> pipe_table;
 
 void waitChildHandler(int signo) {
     int status;
