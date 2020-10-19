@@ -182,7 +182,8 @@ void np_fork(string cmd, bool last_cmd) {
         np_exec(cmd);
     }
     else {  // parent process
-        childpid_list.push_back(child_pid);
+        if (!numpipe_type)
+            childpid_list.push_back(child_pid);
         auto pip_ele = pipe_table.find(cmd_count);
         if (pip_ele != pipe_table.end()) {
             close(pip_ele->second.read_fd);
