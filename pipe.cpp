@@ -24,7 +24,7 @@ typedef struct pipe_info {
 vector<pipe_info> subcmd_pipe_list;
 
 extern long cmd_count;
-extern map<int, pipe_info> pipe_table;
+extern map<int, pipe_info> delay_pipe_table;
 vector<pid_t> childpid_list;
 int redirect_fd, subcmd_count;
 
@@ -99,7 +99,7 @@ void np_fork(string cmd, bool last_cmd) {
 
     pid_t child_pid;
 
-    // create pipe and store in vector list
+    // create pipe for subcmd and store in vector list
     int subcmd_pipe[2];
     pipe_info tmp_pipe;
     pipe(subcmd_pipe);
@@ -107,21 +107,21 @@ void np_fork(string cmd, bool last_cmd) {
     tmp_pipe.write_fd = subcmd_pipe[1];
     subcmd_pipe_list.push_back(tmp_pipe);
 
-    // number pipe
-    long cmd_index = -1;
+    // number (delay) pipe
+    long target_cmd = -1;
     int delay_pipe[2], numpipe_type;
     int pos;
     pipe_info pipe_out;
 
     if ((pos = cmd.find("|")) != string::npos) {
-        long delay_cmd = stol(cmd.substr(pos+1));
-        cmd_index = delay_cmd + cmd_count;
+        long delay = stol(cmd.substr(pos+1));
+        target_cmd = delay + cmd_count;
         cmd = cmd.substr(0, pos);
         numpipe_type = PIPE_STDOUT;
     }
     else if ((pos = cmd.find("!")) != string::npos) {
-        long delay_cmd = stol(cmd.substr(pos+1));
-        cmd_index = delay_cmd + cmd_count;
+        long delay = stol(cmd.substr(pos+1));
+        target_cmd = delay + cmd_count;
         cmd = cmd.substr(0, pos);
         numpipe_type = PIPE_BOTH;
     }
@@ -130,13 +130,11 @@ void np_fork(string cmd, bool last_cmd) {
     }
 
     // find if target number pipe has existed
-    if (numpipe_type && (pipe_table.find(cmd_index) == pipe_table.end())) {   // not exist
+    if (numpipe_type && (delay_pipe_table.find(target_cmd) == delay_pipe_table.end())) {   // not exist
         pipe(delay_pipe);
-
         pipe_out.read_fd = delay_pipe[0];
         pipe_out.write_fd = delay_pipe[1];
-
-        pipe_table.insert(pair<int, pipe_info>(cmd_index, pipe_out));
+        delay_pipe_table.insert(pair<int, pipe_info>(target_cmd, pipe_out));
     }
 
     while ((child_pid = fork())<0) {
@@ -146,13 +144,14 @@ void np_fork(string cmd, bool last_cmd) {
 
     if (child_pid == 0) {   // child process
 
-        if (pipe_table.find(cmd_count)!=pipe_table.end() && !subcmd_count) {
-            dup2(pipe_table.find(cmd_count)->second.read_fd, STDIN_FILENO);
-            close(pipe_table.find(cmd_count)->second.read_fd);
-            close(pipe_table.find(cmd_count)->second.write_fd);
+        // connect with previous commands output (number pipe)
+        if (delay_pipe_table.find(cmd_count)!=delay_pipe_table.end() && !subcmd_count) {
+            dup2(delay_pipe_table.find(cmd_count)->second.read_fd, STDIN_FILENO);
+            close(delay_pipe_table.find(cmd_count)->second.read_fd);
+            close(delay_pipe_table.find(cmd_count)->second.write_fd);
         }
 
-        // connect with pipes
+        // connect with subcmd pipes
         if (!subcmd_count && last_cmd && (numpipe_type == NO_PIPE)) {    // only 1 subcmd
             ;
         }
@@ -168,10 +167,10 @@ void np_fork(string cmd, bool last_cmd) {
         }
 
         if (numpipe_type == PIPE_STDOUT) 
-            dup2(pipe_table.find(cmd_index)->second.write_fd, STDOUT_FILENO);
+            dup2(delay_pipe_table.find(target_cmd)->second.write_fd, STDOUT_FILENO);
         else if (numpipe_type == PIPE_BOTH) {
-            dup2(pipe_table.find(cmd_index)->second.write_fd, STDOUT_FILENO);
-            dup2(pipe_table.find(cmd_index)->second.write_fd, STDERR_FILENO);
+            dup2(delay_pipe_table.find(target_cmd)->second.write_fd, STDOUT_FILENO);
+            dup2(delay_pipe_table.find(target_cmd)->second.write_fd, STDERR_FILENO);
         }
 
         for (const auto& it: subcmd_pipe_list) {
@@ -184,8 +183,8 @@ void np_fork(string cmd, bool last_cmd) {
     else {  // parent process
         if (!numpipe_type)
             childpid_list.push_back(child_pid);
-        auto pip_ele = pipe_table.find(cmd_count);
-        if (pip_ele != pipe_table.end()) {
+        auto pip_ele = delay_pipe_table.find(cmd_count);
+        if (pip_ele != delay_pipe_table.end()) {
             close(pip_ele->second.read_fd);
             close(pip_ele->second.write_fd);
         }
@@ -201,6 +200,8 @@ void execute_cmd(string cmd) {
     subcmd_count = 0;
     subcmd_pipe_list.clear();
 
+    // split cmd into subcmd by pipe delimiter (|)
+    // eg, a | b | c |1 -> a, b, c |1
     while ((new_end = cmd.find(pipe_delimiter)) != string::npos) {
         string cur_cmd = cmd.substr(0, new_end);
         np_fork(cur_cmd, !LAST_CMD);
@@ -217,8 +218,8 @@ void execute_cmd(string cmd) {
         close(it.write_fd);
     }
 
-    auto pip_ele = pipe_table.find(cmd_count);
-    if (pip_ele != pipe_table.end()) {
+    auto pip_ele = delay_pipe_table.find(cmd_count);
+    if (pip_ele != delay_pipe_table.end()) {
         close(pip_ele->second.read_fd);
         close(pip_ele->second.write_fd);
     }

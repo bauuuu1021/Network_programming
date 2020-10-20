@@ -15,7 +15,7 @@ typedef struct pipe_info {
 extern void execute_cmd(string cmd);
 extern string skip_lead_space(string str);
 long cmd_count;
-map<int, pipe_info> pipe_table;
+map<int, pipe_info> delay_pipe_table;
 
 void waitChildHandler(int signo) {
     int status;
@@ -59,7 +59,7 @@ int main () {
     signal(SIGCHLD, waitChildHandler);
     setenv("PATH", "bin:.", !0);
     cmd_count = 0;
-    pipe_table.clear();
+    delay_pipe_table.clear();
 
     string cmd, delimiter = " ";
     cout << "% ";
