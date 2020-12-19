@@ -6,6 +6,9 @@
 #include <string>
 #include <utility>
 
+#define GRANTED 90
+#define REJECT  91
+
 using boost::asio::ip::tcp;
 using namespace std;
 
@@ -15,7 +18,7 @@ class session
     : public std::enable_shared_from_this<session> {
 public:
   session(tcp::socket socket)
-      : client_socket_(std::move(socket)) {
+      : client_socket_(std::move(socket)), server_socket_(io_context) {
   }
 
   void start() {
@@ -61,7 +64,8 @@ private:
   }
 
   void build_connection() {
-
+    auto self(shared_from_this());
+    
   }
 
   void recv_sock4() {
@@ -83,32 +87,68 @@ private:
 
 			      print_info(conn_type, port, ip);
 
-            build_connection();
+            server_socket_.async_connect(tcp::endpoint(boost::asio::ip::address::from_string(ip), port), [this, self](boost::system::error_code ec){
+              if (!ec) {
+                char reply[8] = {0};
+                reply[1] = GRANTED;
+
+                boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
+                      [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+			                  if (ec) {
+                          cerr << "New connection failed\n";
+                        }
+			          });
+                
+                client_read();
+                server_read();
+              }
+            });
 			    }
 			  });
   }
 
-  void do_read() {
+  void client_read() {
     auto self(shared_from_this());
     client_socket_.async_read_some(boost::asio::buffer(data_, max_length),
 			    [this, self](boost::system::error_code ec, std::size_t length) {
 			      if (!ec) {
-				      //do_write(length);
+				      server_write(length);
 			      }
 			    });
   }
 
-  void do_write(std::size_t length) {
+  void client_write(std::size_t length) {
     auto self(shared_from_this());
     boost::asio::async_write(client_socket_, boost::asio::buffer(data_, length),
 			     [this, self](boost::system::error_code ec, std::size_t /*length*/) {
 			       if (!ec) {
-				      do_read();
+				      server_read();
+			       }
+			     });
+  }
+
+  void server_read() {
+    auto self(shared_from_this());
+    server_socket_.async_read_some(boost::asio::buffer(data_, max_length),
+			    [this, self](boost::system::error_code ec, std::size_t length) {
+			      if (!ec) {
+				      client_write(length);
+			      }
+			    });
+  }
+
+  void server_write(std::size_t length) {
+    auto self(shared_from_this());
+    boost::asio::async_write(server_socket_, boost::asio::buffer(data_, length),
+			     [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+			       if (!ec) {
+				      client_read();
 			       }
 			     });
   }
 
   tcp::socket client_socket_;
+  tcp::socket server_socket_;
   enum { max_length = 1024 };
   char data_[max_length];
 };
