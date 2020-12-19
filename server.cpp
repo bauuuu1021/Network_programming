@@ -4,9 +4,12 @@
 #include <utility>
 #include <boost/asio.hpp>
 #include <boost/lexical_cast.hpp>
+#include <string>
 
 using boost::asio::ip::tcp;
 using namespace std;
+
+boost::asio::io_context io_context;
 
 class session
   : public std::enable_shared_from_this<session>
@@ -19,20 +22,45 @@ public:
 
   void start()
   {
-    print_info();
-    do_read();
+    do_receive();
   }
 
 private:
 
-  void print_info() {
-    cout << "<S_IP>: " << boost::lexical_cast<std::string>(socket_.remote_endpoint().address()) << endl;
-	  cout << "<S_PORT>: " << boost::lexical_cast<std::string>(socket_.remote_endpoint().port()) << endl;
-    cout << "<D_IP>: " << endl;
-    cout << "<D_PORT>: " << endl;
-    cout << "<Command>: " << endl;
+  void print_info(int connect_type, uint16_t dst_port, string dst_ip) {
+
+    cout << "<S_IP>: " << socket_.remote_endpoint().address() << endl;
+	  cout << "<S_PORT>: " << socket_.remote_endpoint().port() << endl;
+    cout << "<D_IP>: " << dst_ip << endl;
+    cout << "<D_PORT>: " << dst_port << endl;
+    cout << "<Command>: " << ((connect_type==1)?"CONNECT":"BIND") << endl;
     cout << "<Reply>: " << endl;
 	  cout << "----------------------------\n";
+  }
+
+  void do_receive()
+  {
+    auto self(shared_from_this());
+    socket_.async_receive(boost::asio::buffer(data_, max_length),
+        [this, self](boost::system::error_code ec, std::size_t length)
+        {
+          if (!ec)
+          {
+            int conn_type = (uint8_t)data_[1];
+            uint16_t port = *(uint16_t*)&data_[2];
+            
+            string ip = to_string((data_[4])&0xff) + "." + to_string((data_[5])&0xff) 
+                        + "." + to_string((data_[6])&0xff);
+            if (!(ip.compare("0.0.0")) && ((data_[7])&0xff)) {
+              // resolve domaine name
+            }
+            else {
+              ip = ip + "." + to_string((data_[7])&0xff);
+            }
+
+            print_info(conn_type, port, ip);
+          }
+        });
   }
 
   void do_read()
@@ -105,8 +133,6 @@ int main(int argc, char* argv[])
       std::cerr << "Usage: " << argv[0] << " " << "<port>\n";
       return 1;
     }
-
-    boost::asio::io_context io_context;
 
     server s(io_context, std::atoi(argv[1]));
 
