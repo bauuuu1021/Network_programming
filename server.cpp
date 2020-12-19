@@ -15,18 +15,18 @@ class session
     : public std::enable_shared_from_this<session> {
 public:
   session(tcp::socket socket)
-      : socket_(std::move(socket)) {
+      : client_socket_(std::move(socket)) {
   }
 
   void start() {
-    do_receive();
+    recv_sock4();
   }
 
 private:
   void print_info(int connect_type, uint16_t dst_port, string dst_ip) {
 
-    cout << "<S_IP>: " << socket_.remote_endpoint().address() << endl;
-    cout << "<S_PORT>: " << socket_.remote_endpoint().port() << endl;
+    cout << "<S_IP>: " << client_socket_.remote_endpoint().address() << endl;
+    cout << "<S_PORT>: " << client_socket_.remote_endpoint().port() << endl;
     cout << "<D_IP>: " << dst_ip << endl;
     cout << "<D_PORT>: " << dst_port << endl;
     cout << "<Command>: " << ((connect_type == 1) ? "CONNECT" : "BIND") << endl;
@@ -60,9 +60,13 @@ private:
     return endpoint.address().to_string();
   }
 
-  void do_receive() {
+  void build_connection() {
+
+  }
+
+  void recv_sock4() {
     auto self(shared_from_this());
-    socket_.async_receive(boost::asio::buffer(data_, max_length),
+    client_socket_.async_receive(boost::asio::buffer(data_, max_length),
 			  [this, self](boost::system::error_code ec, std::size_t length) {
 			    if (!ec) {
 			      int conn_type = (uint8_t)data_[1];
@@ -78,13 +82,15 @@ private:
 			      }
 
 			      print_info(conn_type, port, ip);
+
+            build_connection();
 			    }
 			  });
   }
 
   void do_read() {
     auto self(shared_from_this());
-    socket_.async_read_some(boost::asio::buffer(data_, max_length),
+    client_socket_.async_read_some(boost::asio::buffer(data_, max_length),
 			    [this, self](boost::system::error_code ec, std::size_t length) {
 			      if (!ec) {
 				      //do_write(length);
@@ -94,7 +100,7 @@ private:
 
   void do_write(std::size_t length) {
     auto self(shared_from_this());
-    boost::asio::async_write(socket_, boost::asio::buffer(data_, length),
+    boost::asio::async_write(client_socket_, boost::asio::buffer(data_, length),
 			     [this, self](boost::system::error_code ec, std::size_t /*length*/) {
 			       if (!ec) {
 				      do_read();
@@ -102,7 +108,7 @@ private:
 			     });
   }
 
-  tcp::socket socket_;
+  tcp::socket client_socket_;
   enum { max_length = 1024 };
   char data_[max_length];
 };
@@ -117,13 +123,13 @@ public:
 private:
   void do_accept() {
     acceptor_.async_accept(
-	[this](boost::system::error_code ec, tcp::socket socket) {
-	  if (!ec) {
-	    std::make_shared<session>(std::move(socket))->start();
-	  }
+    [this](boost::system::error_code ec, tcp::socket socket) {
+      if (!ec) {
+        std::make_shared<session>(std::move(socket))->start();
+      }
 
-	  do_accept();
-	});
+      do_accept();
+    });
   }
 
   tcp::acceptor acceptor_;
