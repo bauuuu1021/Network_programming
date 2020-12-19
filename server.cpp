@@ -5,7 +5,10 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <fstream>
 
+#define CONN 1
+#define BIND 2
 #define GRANTED 90
 #define REJECT  91
 
@@ -26,14 +29,53 @@ public:
   }
 
 private:
-  void print_info(int connect_type, uint16_t dst_port, string dst_ip) {
+
+  string firewallStatus(int connect_type, string dst_ip) {
+    ifstream conf("socks.conf");
+    string rule;
+
+    while (getline(conf, rule)) {
+      if ((connect_type == CONN && rule.at(7) == 'b') || (connect_type == BIND && rule.at(7) == 'c'))
+        continue;
+      else {
+        rule = rule.substr(rule.find(" ")+1);
+        rule = rule.substr(rule.find(" ")+1);
+        
+        // check if they're match
+        string dst(dst_ip);
+        for (auto i = 0; i < 4; i++) {          
+
+          string r = rule.substr(0, rule.find("."));
+          string d = dst.substr(0, dst.find("."));
+
+          if (!r.compare("*") || !r.compare(d)) {
+            rule = rule.substr(rule.find(".") + 1);
+            dst = dst.substr(dst.find(".") + 1);
+          
+            if (i == 3)
+              return "ACCEPT";
+          }
+          else
+            break;
+        }
+      }
+    }
+
+    conf.close();
+    client_socket_.close();
+    server_socket_.close();
+
+    return "REJECT";
+  }
+
+  void connection_info(int connect_type, uint16_t dst_port, string dst_ip) {
 
     cout << "<S_IP>: " << client_socket_.remote_endpoint().address() << endl;
     cout << "<S_PORT>: " << client_socket_.remote_endpoint().port() << endl;
     cout << "<D_IP>: " << dst_ip << endl;
     cout << "<D_PORT>: " << dst_port << endl;
     cout << "<Command>: " << ((connect_type == 1) ? "CONNECT" : "BIND") << endl;
-    cout << "<Reply>: " << endl;
+    cout << "<Reply>: " << firewallStatus(connect_type, dst_ip) << endl;
     cout << "----------------------------\n";
   }
 
@@ -63,11 +105,6 @@ private:
     return endpoint.address().to_string();
   }
 
-  void build_connection() {
-    auto self(shared_from_this());
-    
-  }
-
   void recv_sock4() {
     auto self(shared_from_this());
     client_socket_.async_receive(boost::asio::buffer(data_, max_length),
@@ -85,7 +122,7 @@ private:
 				      ip = ip + "." + to_string((data_[7]) & 0xff);
 			      }
 
-			      print_info(conn_type, port, ip);
+			      connection_info(conn_type, port, ip);
 
             server_socket_.async_connect(tcp::endpoint(boost::asio::ip::address::from_string(ip), port), [this, self](boost::system::error_code ec){
               if (!ec) {
@@ -97,10 +134,11 @@ private:
 			                  if (ec) {
                           cerr << "New connection failed\n";
                         }
-			          });
-                
-                client_read();
-                server_read();
+                        else {
+                          client_read();
+                          server_read();
+                        }
+			          }); 
               }
             });
 			    }
