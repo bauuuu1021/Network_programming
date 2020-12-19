@@ -19,10 +19,22 @@ public:
 
   void start()
   {
+    print_info();
     do_read();
   }
 
 private:
+
+  void print_info() {
+    cout << "<S_IP>: " << boost::lexical_cast<std::string>(socket_.remote_endpoint().address()) << endl;
+	  cout << "<S_PORT>: " << boost::lexical_cast<std::string>(socket_.remote_endpoint().port()) << endl;
+    cout << "<D_IP>: " << endl;
+    cout << "<D_PORT>: " << endl;
+    cout << "<Command>: " << endl;
+    cout << "<Reply>: " << endl;
+	  cout << "----------------------------\n";
+  }
+
   void do_read()
   {
     auto self(shared_from_this());
@@ -31,7 +43,6 @@ private:
         {
           if (!ec)
           {
-//	    cout << data_ << endl;
             //do_write(length);
           }
         });
@@ -73,14 +84,7 @@ private:
         {
           if (!ec)
           {
-	    cout << "<S_IP>: " << boost::lexical_cast<std::string>(socket.remote_endpoint().address()) << endl;
-	    cout << "<S_PORT>: " << boost::lexical_cast<std::string>(socket.remote_endpoint().port()) << endl;
-            cout << "<D_IP>: " << endl;
-            cout << "<D_PORT>: " << endl;
-            cout << "<Command>: " << endl;
-            cout << "<Reply>: " << endl;
-	    cout << "----------------------------\n";
-	    std::make_shared<session>(std::move(socket))->start();
+	          std::make_shared<session>(std::move(socket))->start();
           }
 
           do_accept();
