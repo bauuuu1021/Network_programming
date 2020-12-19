@@ -66,7 +66,7 @@ private:
 			  [this, self](boost::system::error_code ec, std::size_t length) {
 			    if (!ec) {
 			      int conn_type = (uint8_t)data_[1];
-			      uint16_t port = *(uint16_t *)&data_[2];
+			      uint16_t port = ((data_[2] & 0xff) << 8) | (data_[3] & 0xff);
 			      string ip = to_string((data_[4]) & 0xff) + "." +
 					  to_string((data_[5]) & 0xff) + "." +
 					  to_string((data_[6]) & 0xff);
@@ -87,7 +87,7 @@ private:
     socket_.async_read_some(boost::asio::buffer(data_, max_length),
 			    [this, self](boost::system::error_code ec, std::size_t length) {
 			      if (!ec) {
-				//do_write(length);
+				      //do_write(length);
 			      }
 			    });
   }
@@ -97,7 +97,7 @@ private:
     boost::asio::async_write(socket_, boost::asio::buffer(data_, length),
 			     [this, self](boost::system::error_code ec, std::size_t /*length*/) {
 			       if (!ec) {
-				 do_read();
+				      do_read();
 			       }
 			     });
   }
@@ -132,8 +132,7 @@ private:
 int main(int argc, char *argv[]) {
   try {
     if (argc != 2) {
-      std::cerr << "Usage: " << argv[0] << " "
-		<< "<port>\n";
+      std::cerr << "Usage: " << argv[0] << " " << "<port>\n";
       return 1;
     }
 
