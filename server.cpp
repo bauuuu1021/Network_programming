@@ -30,7 +30,7 @@ public:
 
 private:
 
-  string firewallStatus(int connect_type, string dst_ip) {
+  int firewallStatus(int connect_type, string dst_ip) {
     auto self(shared_from_this());
 
     ifstream conf("socks.conf");
@@ -55,7 +55,7 @@ private:
             dst = dst.substr(dst.find(".") + 1);
           
             if (i == 3)
-              return "ACCEPT";
+              return GRANTED;
           }
           else
             break;
@@ -75,18 +75,22 @@ private:
     conf.close();
     client_socket_.close();
 
-    return "REJECT";
+    return REJECT;
   }
 
-  void connection_info(int connect_type, uint16_t dst_port, string dst_ip) {
+  int connection_info(int connect_type, uint16_t dst_port, string dst_ip) {
 
+    int cmd_code;
+    
     cout << "<S_IP>: " << client_socket_.remote_endpoint().address() << endl;
     cout << "<S_PORT>: " << client_socket_.remote_endpoint().port() << endl;
     cout << "<D_IP>: " << dst_ip << endl;
     cout << "<D_PORT>: " << dst_port << endl;
     cout << "<Command>: " << ((connect_type == 1) ? "CONNECT" : "BIND") << endl;
-    cout << "<Reply>: " << firewallStatus(connect_type, dst_ip) << endl;
+    cout << "<Reply>: " << (((cmd_code = firewallStatus(connect_type, dst_ip)) == GRANTED) ? "ACCEPT" : "REJECT") << endl;
     cout << "----------------------------\n";
+
+    return cmd_code;
   }
 
   string resolve_DNS(char *data_, uint16_t port, size_t length) {
@@ -132,22 +136,27 @@ private:
 				      ip = ip + "." + to_string((data_[7]) & 0xff);
 			      }
 
-			      connection_info(conn_type, port, ip);
+			      if (connection_info(conn_type, port, ip) == REJECT) return;
 
-            server_socket_.async_connect(tcp::endpoint(boost::asio::ip::address::from_string(ip), port), [this, self](boost::system::error_code ec){
-              if (!ec) {
-                char reply[8] = {0};
-                reply[1] = GRANTED;
+            if (conn_type == CONN) {
+              server_socket_.async_connect(tcp::endpoint(boost::asio::ip::address::from_string(ip), port), [this, self](boost::system::error_code ec){
+                if (!ec) {
+                  char reply[8] = {0};
+                  reply[1] = GRANTED;
 
-                boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
-                      [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-			                  if (!ec) {
-                          client_read();
-                          server_read();
-                        }
-			          }); 
-              }
-            });
+                  boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
+                        [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+                          if (!ec) {
+                            client_read();
+                            server_read();
+                          }
+                  }); 
+                }
+              });
+            }
+            else if (conn_type == BIND) {
+              // TODO: BIND
+            }
 			    }
 			  });
   }
