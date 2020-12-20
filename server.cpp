@@ -23,7 +23,7 @@ class session
     : public std::enable_shared_from_this<session> {
 public:
   session(tcp::socket socket)
-      : client_socket_(std::move(socket)), server_socket_(io_context) {
+      : client_socket_(std::move(socket)), server_socket_(io_context), bind_acceptor_(io_context) {
   }
 
   void start() {
@@ -157,7 +157,33 @@ private:
               });
             }
             else if (conn_type == BIND) {
-              // TODO: BIND
+              tcp::endpoint bind_endpoint(tcp::endpoint(tcp::v4(), 0));
+              bind_acceptor_.open(bind_endpoint.protocol());
+              bind_acceptor_.set_option(tcp::acceptor::reuse_address(true));
+              bind_acceptor_.bind(bind_endpoint);
+              bind_acceptor_.listen();
+              
+              uint16_t port = (uint16_t)bind_acceptor_.local_endpoint().port();
+              char reply[8] = {0};
+              reply[1] = GRANTED;
+              reply[2] = (((port & (unsigned int)0xff00) >> (unsigned int)8) & 0xff);
+              reply[3] = ((port & (uint8_t)0xff) & 0xff);
+
+              boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
+                  [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+                    if (!ec) {
+                      cerr << "write success" << endl;
+                    }
+                  });
+
+              bind_acceptor_.async_accept(server_socket_, [this](boost::system::error_code ec) {
+                if (ec) {
+                  cerr << "accept error" << endl;
+                }
+                else {
+                  cerr << "accept success" << endl;
+                }
+              });
             }
 			    }
 			  });
@@ -203,8 +229,8 @@ private:
 			     });
   }
 
-  tcp::socket client_socket_;
-  tcp::socket server_socket_;
+  tcp::socket client_socket_, server_socket_;
+  tcp::acceptor bind_acceptor_;
   enum { max_length = 1024 };
   char data_[max_length];
 };
