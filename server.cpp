@@ -31,6 +31,8 @@ public:
 private:
 
   string firewallStatus(int connect_type, string dst_ip) {
+    auto self(shared_from_this());
+
     ifstream conf("socks.conf");
     string rule;
 
@@ -61,9 +63,17 @@ private:
       }
     }
 
+    char reply[8] = {0};
+    reply[1] = REJECT;
+    boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
+      [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+			  if (ec) {
+          cerr << "reply error" << endl;
+        }
+		});
+    
     conf.close();
     client_socket_.close();
-    server_socket_.close();
 
     return "REJECT";
   }
@@ -131,10 +141,7 @@ private:
 
                 boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
                       [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-			                  if (ec) {
-                          cerr << "New connection failed\n";
-                        }
-                        else {
+			                  if (!ec) {
                           client_read();
                           server_read();
                         }
