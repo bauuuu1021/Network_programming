@@ -6,6 +6,8 @@
 #include <string>
 #include <utility>
 #include <fstream>
+#include <sys/types.h>
+#include <unistd.h>
 
 #define CONN 1
 #define BIND 2
@@ -219,10 +221,21 @@ private:
     acceptor_.async_accept(
     [this](boost::system::error_code ec, tcp::socket socket) {
       if (!ec) {
-        std::make_shared<session>(std::move(socket))->start();
-      }
 
-      do_accept();
+        pid_t pid = fork();
+        if (pid < 0)  {
+          cerr << "fork failed" << endl;
+          do_accept();
+        }
+        else if (pid == 0) {
+          io_context.notify_fork(boost::asio::io_context::fork_child);
+          std::make_shared<session>(std::move(socket))->start();
+        }
+        else {
+          io_context.notify_fork(boost::asio::io_context::fork_parent);
+          do_accept();
+        }
+      }
     });
   }
 
