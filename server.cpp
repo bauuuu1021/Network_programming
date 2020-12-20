@@ -124,109 +124,109 @@ private:
   void recv_sock4() {
     auto self(shared_from_this());
     client_socket_.async_receive(boost::asio::buffer(data_, max_length),
-			  [this, self](boost::system::error_code ec, std::size_t length) {
-			    if (!ec) {
-			      int conn_type = (uint8_t)data_[1];
-			      uint16_t port = ((data_[2] & 0xff) << 8) | (data_[3] & 0xff);
-			      string ip = to_string((data_[4]) & 0xff) + "." +
-					  to_string((data_[5]) & 0xff) + "." +
-					  to_string((data_[6]) & 0xff);
+			[this, self](boost::system::error_code ec, std::size_t length) {
+			  if (ec) return;
 
-			      if (!(ip.compare("0.0.0")) && ((data_[7]) & 0xff)) { // resolve DNS
-				      ip = resolve_DNS(data_, port, length);
-			      } else { // normal request
-				      ip = ip + "." + to_string((data_[7]) & 0xff);
-			      }
+			  int conn_type = (uint8_t)data_[1];
+			  uint16_t port = ((data_[2] & 0xff) << 8) | (data_[3] & 0xff);
+			  string ip = to_string((data_[4]) & 0xff) + "." +
+				            to_string((data_[5]) & 0xff) + "." +
+					          to_string((data_[6]) & 0xff);
 
-			      if (connection_info(conn_type, port, ip) == REJECT) return;
+			  if (!(ip.compare("0.0.0")) && ((data_[7]) & 0xff))
+				  ip = resolve_DNS(data_, port, length);
+        else
+				  ip = ip + "." + to_string((data_[7]) & 0xff);
 
-            if (conn_type == CONN) {
-              server_socket_.async_connect(tcp::endpoint(boost::asio::ip::address::from_string(ip), port), [this, self](boost::system::error_code ec){
-                if (!ec) {
-                  char reply[8] = {0};
-                  reply[1] = GRANTED;
+			  if (connection_info(conn_type, port, ip) == REJECT) return;
 
-                  boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
-                        [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-                          if (!ec) {
-                            client_read();
-                            server_read();
-                          }
-                  }); 
-                }
-              });
-            }
-            else if (conn_type == BIND) {
-              tcp::endpoint bind_endpoint(tcp::endpoint(tcp::v4(), 0));
-              bind_acceptor_.open(bind_endpoint.protocol());
-              bind_acceptor_.set_option(tcp::acceptor::reuse_address(true));
-              bind_acceptor_.bind(bind_endpoint);
-              bind_acceptor_.listen();
-              
-              uint16_t port = (uint16_t)bind_acceptor_.local_endpoint().port();
+        if (conn_type == CONN) {
+          server_socket_.async_connect(tcp::endpoint(boost::asio::ip::address::from_string(ip), port), 
+            [this, self](boost::system::error_code ec){
+            if (!ec) {
               char reply[8] = {0};
               reply[1] = GRANTED;
-              reply[2] = (((port & (unsigned int)0xff00) >> (unsigned int)8) & 0xff);
-              reply[3] = ((port & (uint8_t)0xff) & 0xff);
 
               boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
-                  [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-                    if (!ec) {
-                      cerr << "write success" << endl;
-                    }
-                  });
-
-              bind_acceptor_.async_accept(server_socket_, [this](boost::system::error_code ec) {
-                if (ec) {
-                  cerr << "accept error" << endl;
-                }
-                else {
-                  cerr << "accept success" << endl;
-                }
-              });
+                [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+                  if (!ec) {
+                    client_read();
+                    server_read();
+                  }
+                }); 
             }
-			    }
-			  });
+          });
+        }
+        else if (conn_type == BIND) {
+          tcp::endpoint bind_endpoint(tcp::endpoint(tcp::v4(), 0));
+          bind_acceptor_.open(bind_endpoint.protocol());
+          bind_acceptor_.set_option(tcp::acceptor::reuse_address(true));
+          bind_acceptor_.bind(bind_endpoint);
+          bind_acceptor_.listen();
+              
+          uint16_t port = (uint16_t)bind_acceptor_.local_endpoint().port();
+          char reply[8] = {0};
+          reply[1] = GRANTED;
+          reply[2] = (((port & (unsigned int)0xff00) >> (unsigned int)8) & 0xff);
+          reply[3] = ((port & (uint8_t)0xff) & 0xff);
+
+          boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
+            [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+              if (!ec) {
+                cerr << "write success" << endl;
+              }
+          });
+
+          bind_acceptor_.async_accept(server_socket_, [this](boost::system::error_code ec) {
+            if (ec) {
+              cerr << "accept error" << endl;
+            }
+            else {
+              cerr << "accept success" << endl;
+            }
+          });
+        }
+		});
   }
 
   void client_read() {
     auto self(shared_from_this());
     client_socket_.async_read_some(boost::asio::buffer(data_, max_length),
-			    [this, self](boost::system::error_code ec, std::size_t length) {
-			      if (!ec) {
-				      server_write(length);
-			      }
-			    });
+			[this, self](boost::system::error_code ec, std::size_t length) {
+			  if (!ec) {
+				  server_write(length);
+			  }
+		});
   }
 
   void client_write(std::size_t length) {
     auto self(shared_from_this());
     boost::asio::async_write(client_socket_, boost::asio::buffer(data_, length),
-			     [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-			       if (!ec) {
-				      server_read();
-			       }
-			     });
+			[this, self](boost::system::error_code ec, std::size_t /*length*/) {
+			  if (!ec) {
+				  server_read();
+			  }
+		});
   }
 
   void server_read() {
     auto self(shared_from_this());
     server_socket_.async_read_some(boost::asio::buffer(data_, max_length),
-			    [this, self](boost::system::error_code ec, std::size_t length) {
-			      if (!ec) {
-				      client_write(length);
-			      }
-			    });
+			[this, self](boost::system::error_code ec, std::size_t length) {
+			  if (!ec) {
+				  client_write(length);
+			  }
+		});
   }
 
   void server_write(std::size_t length) {
     auto self(shared_from_this());
     boost::asio::async_write(server_socket_, boost::asio::buffer(data_, length),
-			     [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-			       if (!ec) {
-				      client_read();
-			       }
-			     });
+			[this, self](boost::system::error_code ec, std::size_t /*length*/) {
+			  if (!ec) {
+				  client_read();
+			  }
+			});
   }
 
   tcp::socket client_socket_, server_socket_;
