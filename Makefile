@@ -9,7 +9,7 @@ EXE = http_server
 
 all: $(EXE)
 
-http_server: echo_server.cpp
+http_server: server.cpp
 	$(CXX) -o $@ $^ $(CXX_INCLUDE_PARAMS) $(CXX_LIB_PARAMS) $(CXXFLAGS)
 
 .PHONY: clean
