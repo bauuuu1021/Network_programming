@@ -167,8 +167,8 @@ private:
           uint16_t port = (uint16_t)bind_acceptor_.local_endpoint().port();
           char reply[8] = {0};
           reply[1] = GRANTED;
-          reply[2] = (((port & (unsigned int)0xff00) >> (unsigned int)8) & (uint8_t)0xff);
-          reply[3] = ((port & (uint8_t)0xff) & (uint8_t)0xff);
+          reply[2] = (port >> (uint16_t)8) & (uint8_t)0xff;
+          reply[3] = port & (uint8_t)0xff;
 
           bind_acceptor_.async_accept(server_socket_, [this, self, reply](boost::system::error_code ec) {
             if (!ec) {
@@ -245,6 +245,7 @@ public:
   server(boost::asio::io_context &io_context, short port)
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)) {
     cout << "Welcome to NP proxy" << endl;
+    cout << "----------------------------\n";
     do_accept();
   }
 
