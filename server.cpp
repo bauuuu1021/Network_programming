@@ -244,6 +244,7 @@ class server {
 public:
   server(boost::asio::io_context &io_context, short port)
       : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)) {
+    cout << "Welcome to NP proxy" << endl;
     do_accept();
   }
 
