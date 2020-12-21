@@ -2,9 +2,16 @@
 #include <iostream>
 #include <memory>
 #include <utility>
+#include <string>
+#include <fstream>
+#include <sys/types.h>
+#include <unistd.h>
 #include <boost/asio.hpp>
 
 using boost::asio::ip::tcp;
+using namespace std;
+
+boost::asio::io_context io_context;
 
 class session
   : public std::enable_shared_from_this<session>
@@ -58,6 +65,9 @@ public:
   server(boost::asio::io_context& io_context, short port)
     : acceptor_(io_context, tcp::endpoint(tcp::v4(), port))
   {
+    cout << "------------------------------\n";
+    cout << "Welcome to Remote Batch System" << endl;
+    cout << "------------------------------\n";
     do_accept();
   }
 
@@ -67,12 +77,21 @@ private:
     acceptor_.async_accept(
         [this](boost::system::error_code ec, tcp::socket socket)
         {
-          if (!ec)
-          {
-            std::make_shared<session>(std::move(socket))->start();
+          if (!ec) {
+            pid_t pid = fork();
+            if (pid < 0)  {
+              cerr << "fork failed" << endl;
+              do_accept();
+            }
+            else if (pid == 0) {
+              io_context.notify_fork(boost::asio::io_context::fork_child);
+              std::make_shared<session>(std::move(socket))->start();
+            }
+            else {
+              io_context.notify_fork(boost::asio::io_context::fork_parent);
+              do_accept();
+            }
           }
-
-          do_accept();
         });
   }
 
@@ -88,8 +107,6 @@ int main(int argc, char* argv[])
       std::cerr << "Usage: async_tcp_echo_server <port>\n";
       return 1;
     }
-
-    boost::asio::io_context io_context;
 
     server s(io_context, std::atoi(argv[1]));
 
