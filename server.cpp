@@ -170,24 +170,23 @@ private:
           reply[2] = (((port & (unsigned int)0xff00) >> (unsigned int)8) & (uint8_t)0xff);
           reply[3] = ((port & (uint8_t)0xff) & (uint8_t)0xff);
 
-          cerr << "port " << port << endl;
-
-          bind_acceptor_.async_accept(server_socket_, [this, self](boost::system::error_code ec) {
-            if (ec) {
-              cerr << "accept error" << endl;
-            }
-            else {
-              cerr << "accept success" << endl;
+          bind_acceptor_.async_accept(server_socket_, [this, self, reply](boost::system::error_code ec) {
+            if (!ec) {
+              boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
+                [this, self, reply](boost::system::error_code ec, std::size_t /*length*/) {
+                  if (!ec) {
+                    client_read();
+                    server_read();
+                  }
+              });
             }
           });
 
-           boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
+          boost::asio::async_write(client_socket_, boost::asio::buffer(reply, sizeof(reply)),
              [this, self, reply](boost::system::error_code ec, std::size_t /*length*/) {
-               if (!ec) {
-                 cerr << "write success" << endl;
-                 unsigned char *ptr = (unsigned char *)&reply[0];
-                 cerr << "port: " << ptr[2] * 256 + ptr[3] << endl;
-               }
+                if (ec) {
+                  cerr << "reply port error" << endl;
+                }
           });
 
           
