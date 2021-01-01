@@ -71,7 +71,6 @@ private:
 
     setenv("REQUEST_METHOD", REQUEST_METHOD, !0);
     setenv("REQUEST_URI", REQUEST_URI, !0);
-    setenv("QUERY_STRING", QUERY_STRING, !0);
     setenv("SERVER_PROTOCOL", SERVER_PROTOCOL, !0);
     setenv("HTTP_HOST", HTTP_HOST, !0);
     setenv("SERVER_ADDR", SERVER_ADDR, !0);
@@ -85,14 +84,19 @@ private:
     
     string cgi_name(REQUEST_URI);
     cgi_name = cgi_name.substr(1);
-    if (cgi_name.find("?") != string::npos) {
-      cgi_name = cgi_name.substr(0, cgi_name.find("?"));
+    size_t pos;
+    if ((pos = cgi_name.find("?")) != string::npos) {
+      setenv("QUERY_STRING", (cgi_name.substr(pos + 1)).c_str(), !0);
+      cgi_name = cgi_name.substr(0, pos);
     }
+    else {
+      setenv("QUERY_STRING", "", !0);
+    }
+
     if (cgi_name.compare(cgi_name.size()-4, 4, ".cgi")) {
       response(false);
       return "";
     }
-    
     response(true);
     setupEnv();
       
