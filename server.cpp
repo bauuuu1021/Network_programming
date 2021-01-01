@@ -15,12 +15,25 @@ using namespace std;
 
 boost::asio::io_context io_context;
 
+void printenv() {
+  cout << "REQUEST_METHOD: " << getenv("REQUEST_METHOD") << endl;
+  cout << "REQUEST_URI: " << getenv("REQUEST_URI") << endl;
+  cout << "QUERY_STRING: " << getenv("QUERY_STRING") << endl;
+  cout << "SERVER_PROTOCOL: " << getenv("SERVER_PROTOCOL") << endl;
+  cout << "HTTP_HOST: " << getenv("HTTP_HOST") << endl;
+  cout << "SERVER_ADDR: " << getenv("SERVER_ADDR") << endl;
+  cout << "SERVER_PORT: " << getenv("SERVER_PORT") << endl;
+  cout << "REMOTE_ADDR: " << getenv("REMOTE_ADDR") << endl;
+  cout << "REMOTE_PORT: " << getenv("REMOTE_PORT") << endl;
+  cout << "------------------------------\n";
+}
+
 class session
-  : public std::enable_shared_from_this<session>
+  : public enable_shared_from_this<session>
 {
 public:
   session(tcp::socket socket)
-    : socket_(std::move(socket))
+    : socket_(move(socket))
   {
   }
 
@@ -31,21 +44,60 @@ public:
 
 private:
 
-  void replyOK() {
+  void response(bool isSuccessed) {
     auto self(shared_from_this());
-    string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n";
+    
+    string response;
+    if (isSuccessed) {
+      response = "HTTP/1.1 200 OK\r\n";
+    }
+    else {
+      response = "HTTP/1.1 404 Not Found\r\n";
+    }
+
     boost::asio::async_write(socket_, boost::asio::buffer(response, response.length()), 
-      [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+      [this, self](boost::system::error_code ec, size_t /*length*/) {
         if (ec) {
           cerr << "reply error" << endl;
         }
     });
   }
 
-  void cgi_handler(string request) {
-    string cgi("panel.cgi");
+  void setupEnv() {
+    strcpy(SERVER_ADDR, socket_.local_endpoint().address().to_string().c_str());
+    sprintf(SERVER_PORT, "%u", socket_.local_endpoint().port());
+    strcpy(REMOTE_ADDR, socket_.remote_endpoint().address().to_string().c_str());
+    sprintf(REMOTE_PORT, "%u", socket_.remote_endpoint().port());
+
+    setenv("REQUEST_METHOD", REQUEST_METHOD, !0);
+    setenv("REQUEST_URI", REQUEST_URI, !0);
+    setenv("QUERY_STRING", QUERY_STRING, !0);
+    setenv("SERVER_PROTOCOL", SERVER_PROTOCOL, !0);
+    setenv("HTTP_HOST", HTTP_HOST, !0);
+    setenv("SERVER_ADDR", SERVER_ADDR, !0);
+    setenv("SERVER_PORT", SERVER_PORT, !0);
+    setenv("REMOTE_ADDR", REMOTE_ADDR, !0);
+    setenv("REMOTE_PORT", REMOTE_PORT, !0);
+  }
+
+  string parseRequest(string request) {
+    sscanf(data_, "%s %s %s %s %s", REQUEST_METHOD, REQUEST_URI, SERVER_PROTOCOL, ignore, HTTP_HOST);
     
-    replyOK();
+    string cgi_name(REQUEST_URI);
+    cgi_name = cgi_name.substr(1);
+    if (cgi_name.compare(cgi_name.size()-4, 4, ".cgi")) {
+      response(false);
+      return "";
+    }
+    
+    response(true);
+    setupEnv();
+      
+    return cgi_name;
+  }
+
+  void cgi_handler(string cgi_name) {
+    string cgi("printenv.cgi");
 
     dup2(socket_.native_handle(), 0);
     dup2(socket_.native_handle(), 1);
@@ -60,20 +112,22 @@ private:
   {
     auto self(shared_from_this());
     socket_.async_read_some(boost::asio::buffer(data_, max_length),
-      [this, self](boost::system::error_code ec, std::size_t length) {
+      [this, self](boost::system::error_code ec, size_t length) {
         if (!ec) {
-          cout << data_ << endl;
-          string request(data_);
-          cgi_handler(request);
+          string cgi_name = parseRequest(data_);
+          if (!cgi_name.empty()) {
+            printenv();
+            cgi_handler(cgi_name);
+          }
         }
     });
   }
 
-  void do_write(std::size_t length)
+  void do_write(size_t length)
   {
     auto self(shared_from_this());
     boost::asio::async_write(socket_, boost::asio::buffer(data_, length),
-        [this, self](boost::system::error_code ec, std::size_t /*length*/)
+        [this, self](boost::system::error_code ec, size_t /*length*/)
         {
           if (!ec)
           {
@@ -85,6 +139,9 @@ private:
   tcp::socket socket_;
   enum { max_length = 1024 };
   char data_[max_length];
+  char REQUEST_METHOD[max_length], REQUEST_URI[max_length], QUERY_STRING[max_length],
+    SERVER_PROTOCOL[max_length], HTTP_HOST[max_length], SERVER_ADDR[max_length],
+    SERVER_PORT[max_length], REMOTE_ADDR[max_length], REMOTE_PORT[max_length], ignore[max_length];
 };
 
 class server
@@ -113,7 +170,7 @@ private:
             }
             else if (pid == 0) {
               io_context.notify_fork(boost::asio::io_context::fork_child);
-              std::make_shared<session>(std::move(socket))->start();
+              make_shared<session>(move(socket))->start();
             }
             else {
               io_context.notify_fork(boost::asio::io_context::fork_parent);
@@ -132,17 +189,17 @@ int main(int argc, char* argv[])
   {
     if (argc != 2)
     {
-      std::cerr << "Usage: async_tcp_echo_server <port>\n";
+      cerr << "Usage: async_tcp_echo_server <port>\n";
       return 1;
     }
 
-    server s(io_context, std::atoi(argv[1]));
+    server s(io_context, atoi(argv[1]));
 
     io_context.run();
   }
-  catch (std::exception& e)
+  catch (exception& e)
   {
-    std::cerr << "Exception: " << e.what() << "\n";
+    cerr << "Exception: " << e.what() << "\n";
   }
 
   return 0;
