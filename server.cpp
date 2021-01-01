@@ -85,6 +85,9 @@ private:
     
     string cgi_name(REQUEST_URI);
     cgi_name = cgi_name.substr(1);
+    if (cgi_name.find("?") != string::npos) {
+      cgi_name = cgi_name.substr(0, cgi_name.find("?"));
+    }
     if (cgi_name.compare(cgi_name.size()-4, 4, ".cgi")) {
       response(false);
       return "";
