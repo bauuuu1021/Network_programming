@@ -3,9 +3,11 @@
 #include <memory>
 #include <utility>
 #include <string>
+#include <string.h>
 #include <fstream>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 #include <boost/asio.hpp>
 
 using boost::asio::ip::tcp;
@@ -28,17 +30,43 @@ public:
   }
 
 private:
+
+  void replyOK() {
+    auto self(shared_from_this());
+    string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n";
+    boost::asio::async_write(socket_, boost::asio::buffer(response, response.length()), 
+      [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+        if (ec) {
+          cerr << "reply error" << endl;
+        }
+    });
+  }
+
+  void cgi_handler(string request) {
+    string cgi("panel.cgi");
+    
+    replyOK();
+
+    dup2(socket_.native_handle(), 0);
+    dup2(socket_.native_handle(), 1);
+    dup2(socket_.native_handle(), 2);
+    socket_.close();
+    if (execlp(cgi.c_str(), cgi.c_str(), NULL) < 0) {
+      cerr << strerror(errno) << endl;
+    }
+  }  
+
   void do_read()
   {
     auto self(shared_from_this());
     socket_.async_read_some(boost::asio::buffer(data_, max_length),
-        [this, self](boost::system::error_code ec, std::size_t length)
-        {
-          if (!ec)
-          {
-            do_write(length);
-          }
-        });
+      [this, self](boost::system::error_code ec, std::size_t length) {
+        if (!ec) {
+          cout << data_ << endl;
+          string request(data_);
+          cgi_handler(request);
+        }
+    });
   }
 
   void do_write(std::size_t length)
