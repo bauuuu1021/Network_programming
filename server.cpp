@@ -97,11 +97,11 @@ private:
   }
 
   void cgi_handler(string cgi_name) {
-    string cgi("printenv.cgi");
+    string cgi = "./" + cgi_name;
 
-    dup2(socket_.native_handle(), 0);
-    dup2(socket_.native_handle(), 1);
-    dup2(socket_.native_handle(), 2);
+    dup2(socket_.native_handle(), STDIN_FILENO);
+    dup2(socket_.native_handle(), STDOUT_FILENO);
+    dup2(socket_.native_handle(), STDERR_FILENO);
     socket_.close();
     if (execlp(cgi.c_str(), cgi.c_str(), NULL) < 0) {
       cerr << strerror(errno) << endl;
