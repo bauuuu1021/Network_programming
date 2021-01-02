@@ -85,6 +85,8 @@ public:
             case '<':  buffer.append("&lt;");        break;
             case '>':  buffer.append("&gt;");        break;
             case '\n': buffer.append("&NewLine;");   break;
+            case '\r': buffer.append("");            break;
+            case '\t': buffer.append("&emsp");       break;
             default:   buffer.append(&data[pos], 1); break;
         }
     }
@@ -194,7 +196,7 @@ int main(int argc, char* argv[])
   {
     boost::asio::io_context io_context;
     tcp::endpoint end = resolveDNS("nplinux1.cs.nctu.edu.tw", 12345U);
-    string filename("test_case/t1.txt");
+    string filename("test_case/t2.txt");
     NP_client client(io_context, end, filename);
     io_context.run();
   }
