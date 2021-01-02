@@ -26,7 +26,7 @@ http_server: server.cpp
 	$(CXX) -o $@ $^ $(CXX_INCLUDE_PARAMS) $(CXX_LIB_PARAMS) $(CXXFLAGS)
 
 console.cgi: console.cpp
-	$(CXX) -o $@ $^
+	$(CXX) -o $@ $^ $(CXX_INCLUDE_PARAMS) $(CXX_LIB_PARAMS) $(CXXFLAGS)
 
 .PHONY: clean
 clean:
