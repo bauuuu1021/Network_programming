@@ -108,8 +108,6 @@ public:
   NP_client(boost::asio::io_context& io_context, tcp::endpoint end, string file)
     : socket_(io_context)
   {
-    Web_session web;
-    web.output_command("html test\n");
     load_cmd(file);
     do_connection(end);
   }
@@ -132,7 +130,7 @@ private:
     socket_.async_read_some(boost::asio::buffer(r_buf, max_length),
       [this](boost::system::error_code ec, std::size_t length) {
         if (!ec) {
-          cout << r_buf;
+          web.output_shell(string(r_buf));
           string tmp(r_buf);
           if (tmp.find("% ") != string::npos) {
             send();
@@ -146,12 +144,12 @@ private:
   void send() {
     if (cmd_Q.empty())  return;
 
-    string cmd = cmd_Q.front();
-    cout << cmd << endl;
+    string cmd = cmd_Q.front() + "\n";
+    web.output_command(string(cmd));
     cmd_Q.pop();
 
-    strcpy(w_buf, (cmd + "\n").c_str());
-    size_t length = cmd.size() + 1;
+    strcpy(w_buf, cmd.c_str());
+    size_t length = cmd.size();
 
     boost::asio::async_write(socket_, boost::asio::buffer(w_buf, length),
       [this](boost::system::error_code ec, size_t /*length*/) {
@@ -172,6 +170,7 @@ private:
     });
   }
 
+  Web_session web;
   tcp::socket socket_;
   enum { max_length = 1024 };
   char r_buf[max_length], w_buf[max_length];
@@ -195,7 +194,7 @@ int main(int argc, char* argv[])
   {
     boost::asio::io_context io_context;
     tcp::endpoint end = resolveDNS("nplinux1.cs.nctu.edu.tw", 12345U);
-    string filename("test_case/t2.txt");
+    string filename("test_case/t1.txt");
     NP_client client(io_context, end, filename);
     io_context.run();
   }
