@@ -8,12 +8,108 @@
 using namespace std;
 using boost::asio::ip::tcp;
 
+class Web_session
+{
+public:
+
+  Web_session() {
+    init();
+  }
+
+  void init() {
+    cout << "Content-type: text/html\r\n\r\n";
+    cout <<  
+      "<!DOCTYPE html>"
+      "<html lang=\"en\">"
+        "<head>"
+          "<meta charset=\"UTF-8\" />"
+          "<title>NP Project 3 Console</title>"
+          "<link"
+            "rel=\"stylesheet\""
+            "href=\"https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css\""
+            "integrity=\"sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2\""
+            "crossorigin=\"anonymous\""
+          "/>"
+          "<link"
+            "href=\"https://fonts.googleapis.com/css?family=Source+Code+Pro\""
+            "rel=\"stylesheet\""
+          "/>"
+          "<link"
+            "rel=\"icon\""
+            "type=\"image/png\""
+            "href=\"https://cdn0.iconfinder.com/data/icons/small-n-flat/24/678068-terminal-512.png\""
+          "/>"
+          "<style>"
+            "* {"
+              "font-family: 'Source Code Pro', monospace;"
+              "font-size: 1rem !important;"
+            "}"
+            "body {"
+              "background-color: #212529;"
+            "}"
+            "pre {"
+              "color: #cccccc;"
+            "}"
+            "b {"
+              "color: #01b468;"
+            "}"
+          "</style>"
+        "</head>"
+        "<body>"
+          "<table class=\"table table-dark table-bordered\">"
+            "<thead>"
+              "<tr>"
+                "<th scope=\"col\">nplinux1.cs.nctu.edu.tw:1234</th>"
+                "<th scope=\"col\">nplinux2.cs.nctu.edu.tw:5678</th>"
+              "</tr>"
+            "</thead>"
+            "<tbody>"
+              "<tr>"
+                "<td><pre id=\"s0\" class=\"mb-0\"></pre></td>"
+                "<td><pre id=\"s1\" class=\"mb-0\"></pre></td>"
+              "</tr>"
+            "</tbody>"
+          "</table>"
+        "</body>"
+      "</html>";
+  }
+
+  void escape(std::string& data) {
+    std::string buffer;
+    buffer.reserve(data.size());
+    for(size_t pos = 0; pos != data.size(); ++pos) {
+        switch(data[pos]) {
+            case '&':  buffer.append("&amp;");       break;
+            case '\"': buffer.append("&quot;");      break;
+            case '\'': buffer.append("&apos;");      break;
+            case '<':  buffer.append("&lt;");        break;
+            case '>':  buffer.append("&gt;");        break;
+            case '\n': buffer.append("&NewLine;");   break;
+            default:   buffer.append(&data[pos], 1); break;
+        }
+    }
+    data.swap(buffer);
+  }
+
+  void output_shell(string s) {
+    escape(s);
+    cout << "<script>document.getElementById(\'" << "s0" << "\').innerHTML += \'" << s << "\';</script>" << endl;
+  }
+
+  void output_command(string s) {
+    escape(s);
+    cout << "<script>document.getElementById(\'" << "s0" << "\').innerHTML += \'<b>" << s << "</b>\';</script>" << endl;
+  }
+};
+
 class NP_client 
 {
 public:
   NP_client(boost::asio::io_context& io_context, tcp::endpoint end, string file)
     : socket_(io_context)
   {
+    Web_session web;
+    web.output_command("html test\n");
     load_cmd(file);
     do_connection(end);
   }
@@ -99,7 +195,7 @@ int main(int argc, char* argv[])
   {
     boost::asio::io_context io_context;
     tcp::endpoint end = resolveDNS("nplinux1.cs.nctu.edu.tw", 12345U);
-    string filename("test_case/t1.txt");
+    string filename("test_case/t2.txt");
     NP_client client(io_context, end, filename);
     io_context.run();
   }
