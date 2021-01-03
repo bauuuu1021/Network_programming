@@ -50,8 +50,11 @@ public:
             "pre {"
               "color: #cccccc;"
             "}"
-            "b {"
+            "cmd {"
               "color: #01b468;"
+            "}"
+            "host {"
+              "color: #f7ff0a;"
             "}"
           "</style>"
         "</head>"
@@ -59,8 +62,8 @@ public:
           "<table class=\"table table-dark table-bordered\">"
             "<thead>"
               "<tr>"
-                "<th scope=\"col\">nplinux1.cs.nctu.edu.tw:1234</th>"
-                "<th scope=\"col\">nplinux2.cs.nctu.edu.tw:5678</th>"
+                "<th scope=\"col\"><host>nplinux1.cs.nctu.edu.tw:1234</host></th>"
+                "<th scope=\"col\"><host>nplinux2.cs.nctu.edu.tw:5678</host></th>"
               "</tr>"
             "</thead>"
             "<tbody>"
@@ -100,7 +103,7 @@ public:
 
   void output_command(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << "s0" << "\').innerHTML += \'<b>" << s << "</b>\';</script>" << endl;
+    cout << "<script>document.getElementById(\'" << "s0" << "\').innerHTML += \'<cmd>" << s << "</cmd>\';</script>" << endl;
   }
 };
 
