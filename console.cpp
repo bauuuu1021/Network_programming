@@ -129,10 +129,10 @@ private:
 class NP_client 
 {
 public:
-  NP_client(boost::asio::io_context& io_context, tcp::endpoint end, string file)
+  NP_client(boost::asio::io_context& io_context, tcp::endpoint end, string file, int session_id)
     : socket_(io_context)
   {
-    web.setSessionID(0);
+    web.setSessionID(session_id);
     load_cmd(file);
     do_connection(end);
   }
@@ -209,7 +209,7 @@ tcp::endpoint resolveDNS(string hostname, unsigned short port) {
   return endpoint;
 }
 
-void parseQuery() {
+void parseQueryString() {
   Web_session web;
   string query_string = string(getenv("QUERY_STRING"));
 
@@ -251,12 +251,14 @@ int main(int argc, char* argv[])
 {
   try
   {
-    parseQuery(); return 0;
-    boost::asio::io_context io_context;
-    tcp::endpoint end = resolveDNS("nplinux1.cs.nctu.edu.tw", 12345U);
-    string filename("test_case/t2.txt");
-    NP_client client(io_context, end, filename);
-    io_context.run();
+    parseQueryString();
+    for (auto q : query_list) {
+      boost::asio::io_context io_context;
+      tcp::endpoint end = resolveDNS(q.hostname, (unsigned short)stoul(q.port, NULL, 0));
+      string filename("test_case/" + q.testcase);
+      NP_client client(io_context, end, filename, q.session_id);
+      io_context.run();
+    }
   }
   catch (std::invalid_argument& e)
   {
