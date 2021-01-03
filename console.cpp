@@ -8,13 +8,17 @@
 using namespace std;
 using boost::asio::ip::tcp;
 
+typedef struct query_info_ {
+  tcp::endpoint end;
+  string testcase;
+  int session_id;
+} query_info;
+
 class Web_session
 {
 public:
 
-  Web_session() {
-    init();
-  }
+  Web_session() {}
 
   void init() {
     cout << "Content-type: text/html\r\n\r\n";
@@ -68,13 +72,17 @@ public:
             "</thead>"
             "<tbody>"
               "<tr>"
-                "<td><pre id=\"s0\" class=\"mb-0\"></pre></td>"
-                "<td><pre id=\"s1\" class=\"mb-0\"></pre></td>"
+                "<td><pre id=\"0\" class=\"mb-0\"></pre></td>"
+                "<td><pre id=\"1\" class=\"mb-0\"></pre></td>"
               "</tr>"
             "</tbody>"
           "</table>"
         "</body>"
       "</html>";
+  }
+
+  void setSessionID(int id) {
+    this->session = id;
   }
 
   void escape(std::string& data) {
@@ -98,13 +106,16 @@ public:
 
   void output_shell(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << "s0" << "\').innerHTML += \'" << s << "\';</script>" << endl;
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'" << s << "\';</script>" << endl;
   }
 
   void output_command(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << "s0" << "\').innerHTML += \'<cmd>" << s << "</cmd>\';</script>" << endl;
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<cmd>" << s << "</cmd>\';</script>" << endl;
   }
+
+private:
+  int session;
 };
 
 class NP_client 
@@ -113,6 +124,7 @@ public:
   NP_client(boost::asio::io_context& io_context, tcp::endpoint end, string file)
     : socket_(io_context)
   {
+    web.setSessionID(0);
     load_cmd(file);
     do_connection(end);
   }
@@ -193,6 +205,8 @@ int main(int argc, char* argv[])
 {
   try
   {
+    Web_session web;
+    web.init();
     boost::asio::io_context io_context;
     tcp::endpoint end = resolveDNS("nplinux1.cs.nctu.edu.tw", 12345U);
     string filename("test_case/t2.txt");
