@@ -154,11 +154,7 @@ private:
     size_t length = cmd.size();
 
     boost::asio::async_write(socket_, boost::asio::buffer(w_buf, length),
-      [this](boost::system::error_code ec, size_t /*length*/) {
-        if (!ec) {
-          recv();
-        }
-    });
+      [this](boost::system::error_code ec, size_t /*length*/){});
   }
 
   void do_connection(tcp::endpoint end) {
