@@ -129,15 +129,26 @@ private:
 class NP_client 
 {
 public:
-  NP_client(boost::asio::io_context& io_context, tcp::endpoint end, string file, int session_id)
+  NP_client(boost::asio::io_context& io_context, query_info query)
     : socket_(io_context)
   {
-    web.setSessionID(session_id);
-    load_cmd(file);
-    do_connection(end);
+    web.setSessionID(query.session_id);
+    load_cmd("test_case/" + query.testcase);
+    do_connection(resolveDNS(query.hostname, (unsigned short)stoul(query.port, NULL, 0)));
   }
 
 private:
+
+  tcp::endpoint resolveDNS(string hostname, unsigned short port) {
+
+    boost::asio::io_service io_service;
+    tcp::resolver resolver(io_service);
+    tcp::resolver::query query(hostname, to_string(port));
+    tcp::resolver::iterator iter = resolver.resolve(query);
+    tcp::endpoint endpoint = iter->endpoint();
+
+    return endpoint;
+  }
 
   void load_cmd(string filename) {
     ifstream ifs(filename);
@@ -198,17 +209,6 @@ private:
   queue<string> cmd_Q;
 };
 
-tcp::endpoint resolveDNS(string hostname, unsigned short port) {
-
-  boost::asio::io_service io_service;
-  tcp::resolver resolver(io_service);
-  tcp::resolver::query query(hostname, to_string(port));
-  tcp::resolver::iterator iter = resolver.resolve(query);
-  tcp::endpoint endpoint = iter->endpoint();
-
-  return endpoint;
-}
-
 void parseQueryString() {
   Web_session web;
   string query_string = string(getenv("QUERY_STRING"));
@@ -254,9 +254,7 @@ int main(int argc, char* argv[])
     parseQueryString();
     for (auto q : query_list) {
       boost::asio::io_context io_context;
-      tcp::endpoint end = resolveDNS(q.hostname, (unsigned short)stoul(q.port, NULL, 0));
-      string filename("test_case/" + q.testcase);
-      NP_client client(io_context, end, filename, q.session_id);
+      NP_client client(io_context, q);
       io_context.run();
     }
   }
