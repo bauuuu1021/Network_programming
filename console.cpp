@@ -1,18 +1,24 @@
 #include <iostream>
 #include <fstream>
 #include <queue>
+#include <vector>
 #include <cstdlib>
 #include <cstring>
 #include <boost/asio.hpp>
+
+#define MAX_SERVER 5
 
 using namespace std;
 using boost::asio::ip::tcp;
 
 typedef struct query_info_ {
-  tcp::endpoint end;
+  string hostname;
+  string port;
   string testcase;
   int session_id;
 } query_info;
+
+vector<query_info> query_list;
 
 class Web_session
 {
@@ -65,16 +71,18 @@ public:
         "<body>"
           "<table class=\"table table-dark table-bordered\">"
             "<thead>"
-              "<tr>"
-                "<th scope=\"col\"><host>nplinux1.cs.nctu.edu.tw:1234</host></th>"
-                "<th scope=\"col\"><host>nplinux2.cs.nctu.edu.tw:5678</host></th>"
-              "</tr>"
+              "<tr>";
+    for (auto q : query_list) {
+      cout << "<th scope=\"col\"><host>" << q.hostname << ":" << q.port << "</host></th>";
+    } 
+    cout <<   "</tr>"
             "</thead>"
             "<tbody>"
-              "<tr>"
-                "<td><pre id=\"0\" class=\"mb-0\"></pre></td>"
-                "<td><pre id=\"1\" class=\"mb-0\"></pre></td>"
-              "</tr>"
+              "<tr>";
+    for (auto q : query_list) {
+      cout << "<td><pre id=" << q.session_id << " class=\"mb-0\"></pre></td>";
+    }                   
+    cout <<   "</tr>"
             "</tbody>"
           "</table>"
         "</body>"
@@ -201,12 +209,49 @@ tcp::endpoint resolveDNS(string hostname, unsigned short port) {
   return endpoint;
 }
 
+void parseQuery() {
+  Web_session web;
+  string query_string = string(getenv("QUERY_STRING"));
+
+  for (auto i = 0; i < MAX_SERVER; i++) {
+    query_info query;
+
+    string host_start = "h" + to_string(i);
+    string port_start = "p" + to_string(i);
+    string file_start = "f" + to_string(i);
+
+    unsigned pos;
+    pos = query_string.find("&");
+    query.hostname = query_string.substr(3, pos - 3);
+    query_string = query_string.substr(pos + 1);
+
+    pos = query_string.find("&");
+    query.port = query_string.substr(3, pos - 3);
+    query_string = query_string.substr(pos + 1);
+
+    pos = query_string.find("&");
+    if (pos != string::npos) {
+      query.testcase = query_string.substr(3, pos - 3);
+      query_string = query_string.substr(pos + 1);
+    }
+    else
+      query.testcase = query_string.substr(3);
+
+    if (!query.hostname.empty()) {
+      query.session_id = i;
+      query_list.push_back(query);
+    }
+  }
+
+  web.init();
+  
+}
+
 int main(int argc, char* argv[])
 {
   try
   {
-    Web_session web;
-    web.init();
+    parseQuery(); return 0;
     boost::asio::io_context io_context;
     tcp::endpoint end = resolveDNS("nplinux1.cs.nctu.edu.tw", 12345U);
     string filename("test_case/t2.txt");
