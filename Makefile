@@ -6,8 +6,8 @@ CXX_LIB_DIRS = /usr/local/lib
 CXX_LIB_PARAMS = $(addprefix -L , $(CXX_LIB_DIRS))
 
 EXE = http_server console.cgi
-CMD_SRC = commands
-CMD = noop number removetag removetag0
+CMD_SRC = command
+CMD = delayedremovetag noop number removetag removetag0
 BIN_DIR = bin
 
 all: $(EXE)
