@@ -89,7 +89,7 @@ public:
             "</tbody>"
           "</table>"
         "</body>"
-      "</html>";
+      "</html>" << flush;
   }
 
   void setSessionID(int id) {
@@ -117,17 +117,17 @@ public:
 
   void output_shell(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'" << s << "\';</script>" << endl;
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'" << s << "\';</script>" << endl << flush;
   }
 
   void output_command(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<cmd><b>" << s << "</b></cmd>\';</script>" << endl;
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<cmd><b>" << s << "</b></cmd>\';</script>" << endl << flush;
   }
 
   void output_err(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<err><b>" << s << "</b></err>\';</script>" << endl;  
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<err><b>" << s << "</b></err>\';</script>" << endl << flush;  
   }
 
 private:
@@ -245,7 +245,7 @@ void parseQueryString() {
     else
       query.testcase = query_string.substr(3);
 
-    if (!query.hostname.empty()) {
+    if (!query.hostname.empty() && !query.port.empty() && !query.testcase.empty()) {
       query.session_id = i;
       query_list.push_back(query);
     }
@@ -261,9 +261,12 @@ int main(int argc, char* argv[])
   {
     parseQueryString();
     for (auto q : query_list) {
-      boost::asio::io_context io_context;
-      NP_client client(io_context, q);
-      io_context.run();
+      if (fork() == 0) {
+        boost::asio::io_context io_context;
+        NP_client client(io_context, q);
+        io_context.run();
+        return 0;
+      }
     }
   }
   catch (std::invalid_argument& e)
