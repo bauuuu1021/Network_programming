@@ -63,6 +63,9 @@ public:
             "cmd {"
               "color: #01b468;"
             "}"
+            "err {"
+              "color: #fc0000;"
+            "}"
             "host {"
               "color: #f7ff0a;"
             "}"
@@ -119,7 +122,12 @@ public:
 
   void output_command(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<cmd>" << s << "</cmd>\';</script>" << endl;
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<cmd><b>" << s << "</b></cmd>\';</script>" << endl;
+  }
+
+  void output_err(string s) {
+    escape(s);
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<err><b>" << s << "</b></err>\';</script>" << endl;  
   }
 
 private:
@@ -197,7 +205,7 @@ private:
         recv();
       }
       else {
-        cerr << "Connection failed" << endl;
+        web.output_err("Connection failed\n");
       }
     });
   }
