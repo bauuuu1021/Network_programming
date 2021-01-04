@@ -10,8 +10,11 @@ CMD_SRC = command
 CMD = delayedremovetag noop number removetag removetag0
 BIN_DIR = bin
 
-all: $(EXE)
-
+all:
+	@echo 'The project consists of two part'
+	@echo 'For linux environment, please type `make part1`'
+	@echo 'For windows environment, please type `make part2`'
+	@echo 'For both environment, please type `make build_cmd` to make commands available' 
 build_cmd: unix_cmd $(CMD)
 
 unix_cmd: 
@@ -21,6 +24,8 @@ unix_cmd:
 
 $(CMD): %: $(CMD_SRC)/%.cpp
 	$(CXX) -o $(BIN_DIR)/$@ $^
+
+part1: http_server console.cgi
 
 http_server: server.cpp
 	$(CXX) -o $@ $^ $(CXX_INCLUDE_PARAMS) $(CXX_LIB_PARAMS) $(CXXFLAGS)
