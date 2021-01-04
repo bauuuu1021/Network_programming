@@ -10,10 +10,135 @@
 #include <errno.h>
 #include <boost/asio.hpp>
 
+#define MAX_SERVER 5
+
 using boost::asio::ip::tcp;
 using namespace std;
 
 boost::asio::io_context io_context;
+string QUERY_STRING;
+typedef struct query_info_ {
+  string hostname;
+  string port;
+  string testcase;
+  int session_id;
+} query_info;
+vector<query_info> query_list;
+
+class Web_session
+{
+public:
+
+  Web_session() {}
+
+  string init() {
+    string s = 
+      "<!DOCTYPE html>"
+      "<html lang=\"en\">"
+        "<head>"
+          "<meta charset=\"UTF-8\" />"
+          "<title>NP Project 3 Console</title>"
+          "<link"
+            "rel=\"stylesheet\""
+            "href=\"https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css\""
+            "integrity=\"sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2\""
+            "crossorigin=\"anonymous\""
+          "/>"
+          "<link"
+            "href=\"https://fonts.googleapis.com/css?family=Source+Code+Pro\""
+            "rel=\"stylesheet\""
+          "/>"
+          "<link"
+            "rel=\"icon\""
+            "type=\"image/png\""
+            "href=\"https://cdn0.iconfinder.com/data/icons/small-n-flat/24/678068-terminal-512.png\""
+          "/>"
+          "<style>"
+            "* {"
+              "font-family: 'Source Code Pro', monospace;"
+              "font-size: 1rem !important;"
+            "}"
+            "body {"
+              "background-color: #212529;"
+            "}"
+            "pre {"
+              "color: #cccccc;"
+            "}"
+            "cmd {"
+              "color: #01b468;"
+            "}"
+            "err {"
+              "color: #fc0000;"
+            "}"
+            "host {"
+              "color: #f7ff0a;"
+            "}"
+          "</style>"
+        "</head>"
+        "<body>"
+          "<table class=\"table table-dark table-bordered\">"
+            "<thead>"
+              "<tr>";
+    for (auto q : query_list) {
+      s = s + "<th scope=\"col\"><host>" + q.hostname + ":" + q.port + "</host></th>";
+    } 
+    s = s +  "</tr>"
+            "</thead>"
+            "<tbody>"
+              "<tr>";
+    for (auto q : query_list) {
+      s = s + "<td><pre id=" + to_string(q.session_id) + " class=\"mb-0\"></pre></td>";
+    }                   
+    s = s +  "</tr>"
+            "</tbody>"
+          "</table>"
+        "</body>"
+      "</html>";
+
+    return s;
+  }
+
+  void setSessionID(int id) {
+    this->session = id;
+  }
+
+  void escape(std::string& data) {
+    std::string buffer;
+    buffer.reserve(data.size());
+    for(size_t pos = 0; pos != data.size(); ++pos) {
+        switch(data[pos]) {
+            case '&':  buffer.append("&amp;");       break;
+            case '\"': buffer.append("&quot;");      break;
+            case '\'': buffer.append("&apos;");      break;
+            case '<':  buffer.append("&lt;");        break;
+            case '>':  buffer.append("&gt;");        break;
+            case '\n': buffer.append("&NewLine;");   break;
+            case '\r': buffer.append("");            break;
+            case '\t': buffer.append("&emsp");       break;
+            default:   buffer.append(&data[pos], 1); break;
+        }
+    }
+    data.swap(buffer);
+  }
+
+  void output_shell(string s) {
+    escape(s);
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'" << s << "\';</script>" << endl << flush;
+  }
+
+  void output_command(string s) {
+    escape(s);
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<cmd><b>" << s << "</b></cmd>\';</script>" << endl << flush;
+  }
+
+  void output_err(string s) {
+    escape(s);
+    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<err><b>" << s << "</b></err>\';</script>" << endl << flush;  
+  }
+
+private:
+  int session;
+};
 
 void printenv() {
   cout << "REQUEST_METHOD: " << getenv("REQUEST_METHOD") << endl;
@@ -64,12 +189,13 @@ private:
   }
 
   string parseRequest(string request) {
-    sscanf(data_, "%s %s %s %s %s", REQUEST_METHOD, REQUEST_URI, SERVER_PROTOCOL, ignore, HTTP_HOST);
+    sscanf(r_buf, "%s %s %s %s %s", REQUEST_METHOD, REQUEST_URI, SERVER_PROTOCOL, ignore, HTTP_HOST);
     
     string cgi_name(REQUEST_URI);
     cgi_name = cgi_name.substr(1);
     size_t pos;
     if ((pos = cgi_name.find("?")) != string::npos) {
+      QUERY_STRING = cgi_name.substr(pos + 1);
       cgi_name = cgi_name.substr(0, pos);
     }
 
@@ -247,23 +373,64 @@ private:
     return string(s);
   }
 
+  string parseQueryString() {
+    Web_session web;
+    string query_string = QUERY_STRING;
+
+    for (auto i = 0; i < MAX_SERVER; i++) {
+      query_info query;
+
+      string host_start = "h" + to_string(i);
+      string port_start = "p" + to_string(i);
+      string file_start = "f" + to_string(i);
+
+      unsigned pos;
+      pos = query_string.find("&");
+      query.hostname = query_string.substr(3, pos - 3);
+      query_string = query_string.substr(pos + 1);
+
+      pos = query_string.find("&");
+      query.port = query_string.substr(3, pos - 3);
+      query_string = query_string.substr(pos + 1);
+
+      pos = query_string.find("&");
+      if (pos != string::npos) {
+        query.testcase = query_string.substr(3, pos - 3);
+        query_string = query_string.substr(pos + 1);
+      }
+      else
+        query.testcase = query_string.substr(3);
+
+      if (!query.hostname.empty() && !query.port.empty() && !query.testcase.empty()) {
+        query.session_id = i;
+        query_list.push_back(query);
+      }
+    }
+
+    return web.init();
+    
+  }
+
   void cgi_handler(string cgi_name) {
     
     if (!cgi_name.compare(0, cgi_name.size(), "panel.cgi")) {
-        do_write(panel_content().size());
+      do_write(panel_content().size());
     }
     else if (!cgi_name.compare(0, cgi_name.size(), "console.cgi")) {
-        cout << "console.cgi" << endl;
+      query_list.clear();
+      auto web_init = parseQueryString();
+      strcpy(w_buf, web_init.c_str());  
+      do_write(web_init.size());
     }
   }  
 
   void do_read()
   {
     auto self(shared_from_this());
-    socket_.async_read_some(boost::asio::buffer(data_, max_length),
+    socket_.async_read_some(boost::asio::buffer(r_buf, max_length),
       [this, self](boost::system::error_code ec, size_t length) {
         if (!ec) {
-          string cgi_name = parseRequest(data_);
+          string cgi_name = parseRequest(r_buf);
           if (!cgi_name.empty()) {
             cgi_handler(cgi_name);
           }
@@ -276,18 +443,13 @@ private:
     auto self(shared_from_this());
     boost::asio::async_write(socket_, boost::asio::buffer(w_buf, length),
         [this, self](boost::system::error_code ec, size_t /*length*/)
-        {
-          if (!ec)
-          {
-            //do_read();
-          }
-        });
+        {});
   }
 
   tcp::socket socket_;
   enum { max_length = 1024 };
-  char data_[max_length*50], w_buf[max_length*50];
-  char REQUEST_METHOD[max_length], REQUEST_URI[max_length], QUERY_STRING[max_length],
+  char r_buf[max_length*50], w_buf[max_length*50];
+  char REQUEST_METHOD[max_length], REQUEST_URI[max_length],
     SERVER_PROTOCOL[max_length], HTTP_HOST[max_length], SERVER_ADDR[max_length],
     SERVER_PORT[max_length], REMOTE_ADDR[max_length], REMOTE_PORT[max_length], ignore[max_length];
 };
