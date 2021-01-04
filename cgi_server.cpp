@@ -25,6 +25,7 @@ typedef struct query_info_ {
   int session_id;
 } query_info;
 vector<query_info> query_list;
+tcp::socket toWeb(io_context);
 
 class Web_session
 {
@@ -157,8 +158,8 @@ void printenv() {
 class NP_client 
 {
 public:
-  NP_client(boost::asio::io_context& io_context, query_info query, tcp::socket from_session)
-    : socket_(io_context), toWeb(move(from_session))
+  NP_client(boost::asio::io_context& io_context, query_info query)
+    : socket_(io_context)
   {
     web.setSessionID(query.session_id);
     load_cmd("test_case/" + query.testcase);
@@ -237,7 +238,7 @@ private:
   }
 
   Web_session web;
-  tcp::socket socket_, toWeb;
+  tcp::socket socket_;
   enum { max_length = 1024 };
   char r_buf[max_length], w_buf[max_length];
   queue<string> cmd_Q;
@@ -512,9 +513,11 @@ private:
       strcpy(w_buf, web_init.c_str());  
       do_write(web_init.size());
 
+      toWeb = move(socket_);
+
       for (auto q : query_list) {
         boost::asio::io_context io_context;
-        NP_client client(io_context, q, move(socket_));
+        NP_client client(io_context, q);
         io_context.run();
       }
     }
