@@ -5,7 +5,7 @@ CXX_INCLUDE_PARAMS = $(addprefix -I , $(CXX_INCLUDE_DIRS))
 CXX_LIB_DIRS = /usr/local/lib
 CXX_LIB_PARAMS = $(addprefix -L , $(CXX_LIB_DIRS))
 
-EXE = http_server console.cgi
+EXE = http_server console.cgi cgi_server.exe
 CMD_SRC = command
 CMD = delayedremovetag noop number removetag removetag0
 BIN_DIR = bin
@@ -32,6 +32,11 @@ http_server: server.cpp
 
 console.cgi: console.cpp
 	$(CXX) -o $@ $^ $(CXX_INCLUDE_PARAMS) $(CXX_LIB_PARAMS) $(CXXFLAGS)
+
+part2: cgi_server.exe
+
+cgi_server.exe: cgi_server.cpp
+	$(CXX) -o $@ $^ -lws2_32 -lwsock32 -std=c++14
 
 .PHONY: clean
 clean:
