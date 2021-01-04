@@ -199,7 +199,6 @@ private:
           boost::asio::async_write(toWeb, boost::asio::buffer(s, s.size()),
             [this](boost::system::error_code ec, size_t /*length*/){});
           
-          
           string tmp(r_buf);
           if (tmp.find("% ") != string::npos) {
             send();
@@ -232,7 +231,9 @@ private:
         recv();
       }
       else {
-        web.output_err("Connection failed\n");
+        auto s = web.output_err("Connection failed\n");
+        boost::asio::async_write(toWeb, boost::asio::buffer(s, s.size()),
+            [this](boost::system::error_code ec, size_t /*length*/){});
       }
     });
   }
