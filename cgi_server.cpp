@@ -157,8 +157,8 @@ void printenv() {
 class NP_client 
 {
 public:
-  NP_client(boost::asio::io_context& io_context, query_info query)
-    : socket_(io_context)
+  NP_client(boost::asio::io_context& io_context, query_info query, tcp::socket from_session)
+    : socket_(io_context), toWeb(move(from_session))
   {
     web.setSessionID(query.session_id);
     load_cmd("test_case/" + query.testcase);
@@ -194,7 +194,11 @@ private:
     socket_.async_read_some(boost::asio::buffer(r_buf, max_length),
       [this](boost::system::error_code ec, std::size_t length) {
         if (!ec) {
-          cout << web.output_shell(string(r_buf));
+          auto s = web.output_shell(string(r_buf));
+          boost::asio::async_write(toWeb, boost::asio::buffer(s, s.size()),
+            [this](boost::system::error_code ec, size_t /*length*/){});
+          
+          
           string tmp(r_buf);
           if (tmp.find("% ") != string::npos) {
             send();
@@ -209,7 +213,9 @@ private:
     if (cmd_Q.empty())  return;
 
     string cmd = cmd_Q.front() + "\n";
-    cout << web.output_command(string(cmd));
+    auto s = web.output_command(string(cmd));
+    boost::asio::async_write(toWeb, boost::asio::buffer(s, s.size()),
+      [this](boost::system::error_code ec, size_t /*length*/){});
     cmd_Q.pop();
 
     strcpy(w_buf, cmd.c_str());
@@ -231,7 +237,7 @@ private:
   }
 
   Web_session web;
-  tcp::socket socket_;
+  tcp::socket socket_, toWeb;
   enum { max_length = 1024 };
   char r_buf[max_length], w_buf[max_length];
   queue<string> cmd_Q;
@@ -508,7 +514,7 @@ private:
 
       for (auto q : query_list) {
         boost::asio::io_context io_context;
-        NP_client client(io_context, q);
+        NP_client client(io_context, q, move(socket_));
         io_context.run();
       }
     }
