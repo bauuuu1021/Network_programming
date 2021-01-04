@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <boost/asio.hpp>
+#include <queue>
 
 #define MAX_SERVER 5
 
@@ -121,19 +122,19 @@ public:
     data.swap(buffer);
   }
 
-  void output_shell(string s) {
+  string output_shell(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'" << s << "\';</script>" << endl << flush;
+    return "<script>document.getElementById(\'" + to_string(this->session) + "\').innerHTML += \'" + s +  "\';</script>\n";
   }
 
-  void output_command(string s) {
+  string output_command(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<cmd><b>" << s << "</b></cmd>\';</script>" << endl << flush;
+    return "<script>document.getElementById(\'" + to_string(this->session) + "\').innerHTML += \'<cmd><b>" + s + "</b></cmd>\';</script>\n";
   }
 
-  void output_err(string s) {
+  string output_err(string s) {
     escape(s);
-    cout << "<script>document.getElementById(\'" << this->session << "\').innerHTML += \'<err><b>" << s << "</b></err>\';</script>" << endl << flush;  
+    return "<script>document.getElementById(\'" + to_string(this->session) + "\').innerHTML += \'<err><b>" + s + "</b></err>\';</script>\n";  
   }
 
 private:
@@ -152,6 +153,89 @@ void printenv() {
   cout << "REMOTE_PORT: " << getenv("REMOTE_PORT") << endl;
   cout << "------------------------------\n";
 }
+
+class NP_client 
+{
+public:
+  NP_client(boost::asio::io_context& io_context, query_info query)
+    : socket_(io_context)
+  {
+    web.setSessionID(query.session_id);
+    load_cmd("test_case/" + query.testcase);
+    do_connection(resolveDNS(query.hostname, (unsigned short)stoul(query.port, NULL, 0)));
+  }
+
+private:
+
+  tcp::endpoint resolveDNS(string hostname, unsigned short port) {
+
+    boost::asio::io_service io_service;
+    tcp::resolver resolver(io_service);
+    tcp::resolver::query query(hostname, to_string(port));
+    tcp::resolver::iterator iter = resolver.resolve(query);
+    tcp::endpoint endpoint = iter->endpoint();
+
+    return endpoint;
+  }
+
+  void load_cmd(string filename) {
+    ifstream ifs(filename);
+    string line;
+
+    while (getline(ifs, line)) {
+      cmd_Q.push(line);
+    }
+
+    ifs.close();
+  }
+
+  void recv() {
+    memset(r_buf, 0, max_length);
+    socket_.async_read_some(boost::asio::buffer(r_buf, max_length),
+      [this](boost::system::error_code ec, std::size_t length) {
+        if (!ec) {
+          cout << web.output_shell(string(r_buf));
+          string tmp(r_buf);
+          if (tmp.find("% ") != string::npos) {
+            send();
+          }
+          
+          recv();
+        }
+    });
+  }
+
+  void send() {
+    if (cmd_Q.empty())  return;
+
+    string cmd = cmd_Q.front() + "\n";
+    cout << web.output_command(string(cmd));
+    cmd_Q.pop();
+
+    strcpy(w_buf, cmd.c_str());
+    size_t length = cmd.size();
+
+    boost::asio::async_write(socket_, boost::asio::buffer(w_buf, length),
+      [this](boost::system::error_code ec, size_t /*length*/){});
+  }
+
+  void do_connection(tcp::endpoint end) {
+    socket_.async_connect(end, [this](boost::system::error_code ec){
+      if (!ec) {
+        recv();
+      }
+      else {
+        web.output_err("Connection failed\n");
+      }
+    });
+  }
+
+  Web_session web;
+  tcp::socket socket_;
+  enum { max_length = 1024 };
+  char r_buf[max_length], w_buf[max_length];
+  queue<string> cmd_Q;
+};
 
 class session
   : public enable_shared_from_this<session>
@@ -421,6 +505,12 @@ private:
       auto web_init = parseQueryString();
       strcpy(w_buf, web_init.c_str());  
       do_write(web_init.size());
+
+      for (auto q : query_list) {
+        boost::asio::io_context io_context;
+        NP_client client(io_context, q);
+        io_context.run();
+      }
     }
   }  
 
